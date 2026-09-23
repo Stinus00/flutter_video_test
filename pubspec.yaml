@@ -13,6 +13,7 @@ dependencies:
   http: ^1.6.0
   path_provider: ^2.1.6
   video_player: ^2.14.0
+  wakelock_plus: ^1.8.0
 
 dev_dependencies:
   flutter_test:

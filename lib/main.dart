@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'video.dart';
 
@@ -149,9 +150,8 @@ class _VideoAppState extends State<VideoApp> {
       duration: 5000.0,
     ),
     MediaLink(
-      link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/0002_0003%20X1%3D853%20Y1%3D480%20X2%3D1920%20Y2%3D1080.jpg',
-      type: 'image',
-      duration: 5000.0,
+      link: 'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos/2eba793b-f285-44bc-9e3e-767744386aeb/gymna-launch.mp4',
+      type: 'video',
     ),
     MediaLink(
       link: 'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos/0a6fa960-66e4-4805-87a2-b592e530e0e9/VID%20Rotate270gr.mp4',
@@ -163,7 +163,7 @@ class _VideoAppState extends State<VideoApp> {
       duration: 5000.0,
     ),
     MediaLink(
-      link: 'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos/0a6fa960-66e4-4805-87a2-b592e530e0e9/VID%20Rotate270gr.mp4',
+      link:   'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos/1755a007-b452-47a8-9611-1dcbf4086a31/CDP_Huisstijl-introductie-video-1920x1080.mp4',
       type: 'video',
     ),
     // MediaLink(
@@ -179,6 +179,7 @@ class _VideoAppState extends State<VideoApp> {
   @override
   void initState() {
     super.initState();
+    unawaited(WakelockPlus.enable());
     _initializeMedia();
   }
 
@@ -235,6 +236,7 @@ class _VideoAppState extends State<VideoApp> {
 
     try {
       await controller.setLooping(false);
+      controller.value = controller.value.copyWith(volume: 0.0);
       await controller.initialize();
       if (!mounted) return;
       if (!kIsWeb || _hasStartedPlayback) {
@@ -355,6 +357,7 @@ class _VideoAppState extends State<VideoApp> {
   void dispose() {
     _imageTimer?.cancel();
     _controller?.dispose();
+    unawaited(WakelockPlus.disable());
     super.dispose();
   }
 }
