@@ -147,6 +147,7 @@ class _VideoAppState extends State<VideoApp> {
     await _initializeMedia();
   }
 
+  // Widget to display the app
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -163,6 +164,11 @@ class _VideoAppState extends State<VideoApp> {
     );
   }
 
+  // Widget to show the media
+  // // Image loading using Image.network on web
+  // //  and Image.file on app
+  // // Video loading using Videoplayer and controller
+  // // Loading screen while media gets downloaded
   Widget _buildMedia() {
     if (_isPreparingMedia) {
       return const CircularProgressIndicator();
@@ -215,6 +221,8 @@ class _VideoAppState extends State<VideoApp> {
         : const CircularProgressIndicator();
   }
 
+  // Start button widget for web
+  //  to comply with autoplay restrictions.
   Widget _buildStartButton() {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
