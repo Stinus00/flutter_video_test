@@ -44,9 +44,12 @@ class _VideoAppState extends State<VideoApp> {
     unawaited(_prepareMedia());
   }
 
+  // Download the media given and initialize the first media.
   Future<void> _prepareMedia() async {
     try {
-      _mediaLinks = kIsWeb
+      // If on web give back just the links, 
+      //  otherwise download media.
+      _mediaLinks = kIsWeb == true
           ? List.of(mediaLinks)
           : await _mediaDownloader.downloadAllMedia(links: mediaLinks);
       _isPreparingMedia = false;
@@ -61,6 +64,9 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  // Check if first media is image or video
+  //  then set first media appropriately
+  //  (set timer for image and set controller for video)
   Future<void> _initializeMedia() async {
     final media = _currentMedia;
     if (media == null) return;
@@ -76,6 +82,8 @@ class _VideoAppState extends State<VideoApp> {
       return;
     }
 
+    // Use file path if not on web and
+    //  use url if on web.
     VideoPlayerController controller;
     if (!kIsWeb) {
       _videoPath = media.link;
@@ -87,6 +95,7 @@ class _VideoAppState extends State<VideoApp> {
     _controller = controller;
     controller.addListener(_handleVideoState);
 
+    // Add controller settings.
     try {
       await controller.setLooping(false);
       controller.value = controller.value.copyWith(volume: 0.0);
@@ -116,6 +125,10 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  // Play next media.
+  // // Stop image timer if there is one
+  // // Remove controller if there is one
+  // // Find next link
   Future<void> _playNextMedia() async {
     if (_mediaLinks.isEmpty) return;
 

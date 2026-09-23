@@ -10,6 +10,7 @@ class MediaDownloader {
 
   final Dio _dio;
 
+  // Download all media gathered from media_sources
   Future<List<MediaLink>> downloadAllMedia({
     required List<MediaLink> links,
   }) async {
