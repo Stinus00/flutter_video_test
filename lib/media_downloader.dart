@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter_video_test/media_link.dart';
 
 import 'package:dio/dio.dart';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 class MediaDownloader {
@@ -34,19 +33,22 @@ class MediaDownloader {
   }
 
   // Start download on image
-  Future<String> _downloadImage({required String link}) async {
+  Future<String> _downloadImage({
+    required String link,
+    void Function(int received, int total)? onReceiveProgress,
+  }) async {
     final directory = await getApplicationDocumentsDirectory();
     final name = _fileName(link);
     final imageDirectory = Directory('${directory.path}/images');
     final file = File('${imageDirectory.path}/$name.jpg');
 
     if (!await file.exists()) {
-      final response = await http.get(Uri.parse(link));
-      if (response.statusCode != 200) {
-        throw HttpException('Failed to download image: ${response.statusCode}');
-      }
       await imageDirectory.create(recursive: true);
-      await file.writeAsBytes(response.bodyBytes);
+      await _dio.download(
+        link,
+        file.path,
+        onReceiveProgress: onReceiveProgress,
+      );
     }
 
     return file.path;
