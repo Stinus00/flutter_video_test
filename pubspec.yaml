@@ -10,6 +10,7 @@ dependencies:
   dio: ^5.11.1
   flutter:
     sdk: flutter
+  fvp: ^0.38.1
   http: ^1.6.0
   path_provider: ^2.1.6
   video_player: ^2.14.0

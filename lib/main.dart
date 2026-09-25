@@ -5,12 +5,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:fvp/fvp.dart' as fvp;
 
 import 'media_downloader.dart';
 import 'media_link.dart';
 import 'media_sources.dart';
 
-void main() => runApp(const VideoApp());
+void main() {
+  fvp.registerWith();
+  runApp(const VideoApp());
+}
 
 class VideoApp extends StatefulWidget {
   const VideoApp({super.key});
