@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:web_browser_detect/web_browser_detect.dart';
 
 import 'media_downloader.dart';
 import 'media_link.dart';
@@ -34,6 +36,8 @@ class _VideoAppState extends State<VideoApp> {
   String? _preloadError;
   int _currentLinkIndex = 0;
 
+  Browser? _browser;
+
   MediaLink? get _currentMedia =>
       _mediaLinks.isEmpty ? null : _mediaLinks[_currentLinkIndex];
 
@@ -42,6 +46,12 @@ class _VideoAppState extends State<VideoApp> {
     super.initState();
     unawaited(WakelockPlus.enable());
     unawaited(_prepareMedia());
+  }
+
+  void _checkForWebBrowser() {
+    if(kIsWeb) {
+      _browser = Browser.detectOrNull();
+    }
   }
 
   // Download the media given and initialize the first media.
@@ -81,6 +91,8 @@ class _VideoAppState extends State<VideoApp> {
       );
       return;
     }
+
+    _checkForWebBrowser();
 
     // Use file path if not on web and
     //  use url if on web.
@@ -158,6 +170,14 @@ class _VideoAppState extends State<VideoApp> {
           children: [
             Center(child: _buildMedia()),
             _buildStartButton(),
+            Column(
+              mainAxisAlignment: .center,
+              mainAxisSize: .min,
+              children: [
+                Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
+                Text('Version is ${_browser?.version ?? 'Not on web'}'),
+              ]
+            ),
           ],
         ),
       ),
