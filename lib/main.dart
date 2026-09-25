@@ -47,6 +47,7 @@ class _VideoAppState extends State<VideoApp> {
     unawaited(_prepareMedia());
   }
 
+  // Check which webbrowser the user is using
   void _checkForWebBrowser() {
     if(kIsWeb) {
       _browser = Browser.detectOrNull();
@@ -91,6 +92,7 @@ class _VideoAppState extends State<VideoApp> {
       return;
     }
 
+    
     _checkForWebBrowser();
 
     // Use file path if not on web and
