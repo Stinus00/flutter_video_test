@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:flutter_video_test/media_link.dart';
 
 import 'package:dio/dio.dart';
@@ -59,10 +60,20 @@ class MediaDownloader {
     required String link,
     void Function(int received, int total)? onReceiveProgress,
   }) async {
+
     final directory = await getApplicationDocumentsDirectory();
     final name = _fileName(link);
     final videoDirectory = Directory('${directory.path}/videos');
     final file = File('${videoDirectory.path}/$name.mp4');
+
+    if (!_checkHttp(link) && _checkAsset(link)){
+      final byteData = await rootBundle.load(link);
+      await file.writeAsBytes(
+        byteData.buffer.asUint8List(),
+        flush: true,
+      );
+      return file.path;
+    }
 
     if (!await file.exists()) {
       await videoDirectory.create(recursive: true);
@@ -79,10 +90,26 @@ class MediaDownloader {
   // Get the file name
   String _fileName(String link) {
     final path = Uri.parse(link).pathSegments.last;
-    final decodedName = Uri.decodeComponent(path);
-    final extensionIndex = decodedName.lastIndexOf('.');
-    return extensionIndex == -1
-        ? decodedName
-        : decodedName.substring(0, extensionIndex);
+
+    final extensionIndex = path.lastIndexOf('.');
+    final name = extensionIndex == -1
+        ? path
+        : path.substring(0, extensionIndex);
+
+    try {
+      return Uri.decodeComponent(name);
+    } catch (_) {
+      return name;
+    }
+  }
+
+  // Check if video is a link
+  bool _checkHttp(String link) {
+    return link.contains('http');
+  }
+
+  // Check if video is an asset
+  bool _checkAsset(String link) {
+    return link.contains('assets/');
   }
 }

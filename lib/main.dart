@@ -209,7 +209,7 @@ class _VideoAppState extends State<VideoApp> {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
-          'Could not load video:\n$_videoError',
+          'Could not load video:\n$_videoError\n$_videoPath',
           textAlign: TextAlign.center,
         ),
       );
