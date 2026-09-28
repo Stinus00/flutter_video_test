@@ -171,14 +171,15 @@ class _VideoAppState extends State<VideoApp> {
           children: [
             Center(child: _buildMedia()),
             _buildStartButton(),
-            Column(
-              mainAxisAlignment: .center,
-              mainAxisSize: .min,
-              children: [
-                Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
-                Text('Version is ${_browser?.version ?? 'Not on web'}'),
-              ]
-            ),
+            if (kIsWeb)
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
+                  Text('Version is ${_browser?.version ?? 'Not on web'}'),
+                ],
+              ),
           ],
         ),
       ),
