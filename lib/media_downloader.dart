@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/media_link.dart';
 
@@ -7,7 +8,6 @@ import 'package:path_provider/path_provider.dart';
 
 class MediaDownloader {
   MediaDownloader({Dio? dio}) : _dio = dio ?? Dio();
-
   final Dio _dio;
 
   // Download all media gathered from media_sources
@@ -45,6 +45,9 @@ class MediaDownloader {
 
     if (!await file.exists()) {
       await imageDirectory.create(recursive: true);
+      if (kDebugMode) {
+        print('Test banana test');
+      }
       await _dio.download(
         link,
         file.path,

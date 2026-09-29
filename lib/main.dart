@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_video_test/media_cacher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_browser_detect/web_browser_detect.dart';
@@ -22,6 +23,7 @@ class VideoApp extends StatefulWidget {
 
 class _VideoAppState extends State<VideoApp> {
   final MediaDownloader _mediaDownloader = MediaDownloader();
+  final MediaCacher _mediaCacher = MediaCacher();
   List<MediaLink> _mediaLinks = [];
 
   String? _imagePath;
@@ -60,7 +62,7 @@ class _VideoAppState extends State<VideoApp> {
       // If on web give back just the links, 
       //  otherwise download media.
       _mediaLinks = kIsWeb == true
-          ? List.of(mediaLinks)
+          ? await _mediaCacher.cacheAllMedia(links: mediaLinks)
           : await _mediaDownloader.downloadAllMedia(links: mediaLinks);
       _isPreparingMedia = false;
       if (mounted) setState(() {});
@@ -85,10 +87,9 @@ class _VideoAppState extends State<VideoApp> {
 
       if (!mounted) return;
       setState(() {});
-      _imageTimer = Timer(
-        Duration(milliseconds: (media.duration ?? 5000).round()),
-        _playNextMedia,
-      );
+      if (!kIsWeb || _hasStartedPlayback) {
+        _startImageTimer(media);
+      }
       return;
     }
 
@@ -138,6 +139,14 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  void _startImageTimer(MediaLink media) {
+    _imageTimer?.cancel();
+    _imageTimer = Timer(
+      Duration(milliseconds: (media.duration ?? 5000).round()),
+      _playNextMedia,
+    );
+  }
+
   // Play next media.
   // // Stop image timer if there is one
   // // Remove controller if there is one
@@ -171,15 +180,15 @@ class _VideoAppState extends State<VideoApp> {
           children: [
             Center(child: _buildMedia()),
             _buildStartButton(),
-            if (kIsWeb)
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
-                  Text('Version is ${_browser?.version ?? 'Not on web'}'),
-                ],
-              ),
+            // if (kIsWeb)
+            //   Column(
+            //     mainAxisAlignment: MainAxisAlignment.center,
+            //     mainAxisSize: MainAxisSize.min,
+            //     children: [
+            //       Text('Browser is ${_browser?.browser ?? 'Not on web'}'),
+            //       Text('Version is ${_browser?.version ?? 'Not on web'}'),
+            //     ],
+            //   ),
           ],
         ),
       ),
@@ -246,6 +255,9 @@ class _VideoAppState extends State<VideoApp> {
   // Start button widget for web
   //  to comply with autoplay restrictions.
   Widget _buildStartButton() {
+    final media = _currentMedia;
+    final isImage = media?.type == 'image';
+
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
       transitionBuilder: (child, animation) => ScaleTransition(
@@ -255,8 +267,9 @@ class _VideoAppState extends State<VideoApp> {
       child: _videoError == null &&
               kIsWeb &&
               !_hasStartedPlayback &&
-              _controller?.value.isInitialized == true &&
-              !_controller!.value.isPlaying
+                (isImage ||
+                  (_controller?.value.isInitialized == true &&
+                    !_controller!.value.isPlaying))
           ? FloatingActionButton.extended(
               key: const ValueKey('sample-button'),
               backgroundColor: const Color.fromARGB(99, 0, 0, 0),
@@ -266,7 +279,11 @@ class _VideoAppState extends State<VideoApp> {
               onPressed: () {
                 setState(() {
                   _hasStartedPlayback = true;
-                  _controller!.play();
+                  if (isImage) {
+                    _startImageTimer(media!);
+                  } else {
+                    _controller!.play();
+                  }
                 });
               },
               icon: const Icon(Icons.play_arrow),
