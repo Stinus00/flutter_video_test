@@ -71,6 +71,7 @@ class _VideoAppState extends State<VideoApp> {
         _isPreparingMedia = false;
         _preloadError = error.toString();
       });
+      _skipMedia();
     }
   }
 
@@ -124,6 +125,7 @@ class _VideoAppState extends State<VideoApp> {
       setState(() {
         _videoError = error.toString();
       });
+      _skipMedia();
     }
   }
 
@@ -136,6 +138,14 @@ class _VideoAppState extends State<VideoApp> {
         !_isChangingVideo) {
       unawaited(_playNextMedia());
     }
+  }
+
+  // Skip current media because of error
+  // // Remove media from list
+  void _skipMedia() {
+    _mediaLinks.removeAt(_currentLinkIndex);
+    _currentLinkIndex -= 1;
+    _playNextMedia();
   }
 
   // Play next media.
@@ -196,6 +206,8 @@ class _VideoAppState extends State<VideoApp> {
       return const CircularProgressIndicator();
     }
     if (_preloadError != null) {
+      _skipMedia();
+
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -206,6 +218,8 @@ class _VideoAppState extends State<VideoApp> {
     }
 
     if (_videoError != null) {
+      _skipMedia();
+
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(

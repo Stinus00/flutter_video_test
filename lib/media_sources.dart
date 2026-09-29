@@ -79,6 +79,14 @@ const List<MediaLink> mediaLinks = [
     type: 'video',
   ),
   MediaLink(
+    link: 'https://broken/link',
+    type: 'video',
+  ),
+  MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos/d69268db-64a3-4412-94f2-069b99e8aa91/samba.mp4',
+    type: 'image',
+  ),
+  MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos/b42f8da1-21cb-4eae-85bd-5e0fca1bdc47/Loreen%20-%20Tattoo.mp4',
     type: 'video',
   ),
