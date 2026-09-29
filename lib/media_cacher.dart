@@ -50,13 +50,24 @@ class MediaCacher {
     final downloadedLinks = <MediaLink>[];
 
     for (final media in links) {
+      if(media.type == 'video') {
+        downloadedLinks.add(
+        MediaLink(
+          link: media.link,
+          type: media.type,
+          duration: media.duration,
+        ),
+      );
+        continue;
+      }
+
       final path = media.type == 'image'
           ? await _cacheWebImage(_getTemporaryId(media.link), media.link, null)
-          : await _cacheWebVideo(_getTemporaryId(media.link), media.link, null);
+          : null; // await _cacheWebVideo(_getTemporaryId(media.link), media.link, null);
 
       downloadedLinks.add(
         MediaLink(
-          link: path,
+          link: path!,
           type: media.type,
           duration: media.duration,
         ),
@@ -95,103 +106,103 @@ class MediaCacher {
   // Put video into IndexedDB
   // // Change to download to cache. 
   // // Out of memory issue encountered on Firestick.
-  Future<String> _cacheWebVideo(
-    String videoId,
-    String url,
-    void Function(double progress)? onProgress,
-  ) async {
-    // Check if video exists
-    // If exists skip download part
-    if(await containsVideoWeb(videoId)) {
-      final bytes = await getVideoWeb(videoId);
-      if(bytes != null) {
-        final blob = _createBlobUrl(bytes);
-        return blob;
-      }
-    }
+  // Future<String> _cacheWebVideo(
+  //   String videoId,
+  //   String url,
+  //   void Function(double progress)? onProgress,
+  // ) async {
+  //   // Check if video exists
+  //   // If exists skip download part
+  //   if(await containsVideoWeb(videoId)) {
+  //     final bytes = await getVideoWeb(videoId);
+  //     if(bytes != null) {
+  //       final blob = _createBlobUrl(bytes);
+  //       return blob;
+  //     }
+  //   }
+  // 
+  //   // Get video in bytes
+  //   final response = await Dio().get<List<int>>(
+  //     url,
+  //     options: Options(responseType: ResponseType.bytes), // Set the response type to `bytes`.
+  //   );
+  // 
+  //   if (response.statusCode != 200 || response.data == null) {
+  //     throw Exception('[media_downloader.dart] Failed to download video');
+  //   }
+  // 
+  //   final bytes = Uint8List.fromList(response.data!);
+  // 
+  //   final db = await database;
+  // 
+  //   final txn = db.transaction('videos', idbModeReadWrite);
+  //   final store = txn.objectStore('videos');
+  // 
+  //   final key = await store.add({'id': videoId, 'bytes': bytes});
+  //   final video = await store.getObject(key);
+  // 
+  //   await txn.completed;
+  // 
+  //   return _createBlobUrl(bytes);
+  // }
 
-    // Get video in bytes
-    final response = await Dio().get<List<int>>(
-      url,
-      options: Options(responseType: ResponseType.bytes), // Set the response type to `bytes`.
-    );
+  // // Get video from IndexedDB
+  // Future<Uint8List?> getVideoWeb(String id) async {
+  //   final db = await database;
+  // 
+  //   final transaction = db.transaction(
+  //     'videos',
+  //     idbModeReadOnly,
+  //   );
+  // 
+  //   final value = await transaction.objectStore('videos').getObject(id);
+  // 
+  //   await transaction.completed;
+  // 
+  //   if (value == null) {
+  //     return null;
+  //   }
+  // 
+  //   if (value is Uint8List) {
+  //     return value;
+  //   }
+  // 
+  //   if (value is List<int>) {
+  //     return Uint8List.fromList(value);
+  //   }
+  // 
+  //   return null;
+  // }
 
-    if (response.statusCode != 200 || response.data == null) {
-      throw Exception('[media_downloader.dart] Failed to download video');
-    }
+  // // Check if video exists in IndexedDB
+  // Future<bool> containsVideoWeb(String id) async {
+  //   final db = await database;
+  //
+  //   final transaction = db.transaction(
+  //     'videos',
+  //     idbModeReadOnly,
+  //   );
+  //
+  //   final value = await transaction.objectStore('videos').getObject(id);
+  //
+  //   await transaction.completed;
+  //
+  //   return value != null;
+  // }
 
-    final bytes = Uint8List.fromList(response.data!);
-
-    final db = await database;
-
-    final txn = db.transaction('videos', idbModeReadWrite);
-    final store = txn.objectStore('videos');
-
-    final key = await store.add({'id': videoId, 'bytes': bytes});
-    final video = await store.getObject(key);
-
-    await txn.completed;
-
-    return _createBlobUrl(bytes);
-  }
-
-  // Get video from IndexedDB
-  Future<Uint8List?> getVideoWeb(String id) async {
-    final db = await database;
-
-    final transaction = db.transaction(
-      'videos',
-      idbModeReadOnly,
-    );
-
-    final value = await transaction.objectStore('videos').getObject(id);
-
-    await transaction.completed;
-
-    if (value == null) {
-      return null;
-    }
-
-    if (value is Uint8List) {
-      return value;
-    }
-
-    if (value is List<int>) {
-      return Uint8List.fromList(value);
-    }
-
-    return null;
-  }
-
-  // Check if video exists in IndexedDB
-  Future<bool> containsVideoWeb(String id) async {
-    final db = await database;
-
-    final transaction = db.transaction(
-      'videos',
-      idbModeReadOnly,
-    );
-
-    final value = await transaction.objectStore('videos').getObject(id);
-
-    await transaction.completed;
-
-    return value != null;
-  }
-
-  // Delete video from IndexedDB
-  Future<void> deleteVideoWeb(String id) async {
-    final db = await database;
-
-    final transaction = db.transaction(
-      'videos',
-      idbModeReadWrite,
-    );
-
-    await transaction.objectStore('videos').delete(id);
-
-    await transaction.completed;
-  }
+  // // Delete video from IndexedDB
+  // Future<void> deleteVideoWeb(String id) async {
+  //   final db = await database;
+  //
+  //   final transaction = db.transaction(
+  //     'videos',
+  //     idbModeReadWrite,
+  //   );
+  //
+  //   await transaction.objectStore('videos').delete(id);
+  //
+  //   await transaction.completed;
+  // }
 
   // Put image into IndexedDB
   Future<String> _cacheWebImage(
@@ -209,7 +220,7 @@ class MediaCacher {
       }
     }
 
-    // Get image in bytes format.
+    // Get image in bytes
     final response = await Dio().get<List<int>>(
       url,
       options: Options(responseType: ResponseType.bytes), // Set the response type to `bytes`.
