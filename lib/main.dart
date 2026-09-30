@@ -24,6 +24,9 @@ class _VideoAppState extends State<VideoApp> {
   final MediaDownloader _mediaDownloader = MediaDownloader();
   List<MediaLink> _mediaLinks = [];
 
+  // Testing
+  bool _initialPlaylistActive = true;
+
   String? _imagePath;
   String? _videoPath;
   VideoPlayerController? _controller;
@@ -32,6 +35,7 @@ class _VideoAppState extends State<VideoApp> {
   bool _isChangingVideo = false;
   bool _hasStartedPlayback = false;
   bool _isPreparingMedia = true;
+  bool _changingPlaylist = false;
   String? _preloadError;
   int _currentLinkIndex = 0;
 
@@ -44,7 +48,7 @@ class _VideoAppState extends State<VideoApp> {
   void initState() {
     super.initState();
     unawaited(WakelockPlus.enable());
-    unawaited(_prepareMedia());
+    unawaited(_prepareMedia(mediaLinks));
   }
 
   // Check which webbrowser the user is using
@@ -54,14 +58,21 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  Future<void> _startNextPlaylist() async {
+    _currentLinkIndex = 0;
+    _prepareMedia( _initialPlaylistActive == true ? mediaLinksExtra : mediaLinks);
+    _initialPlaylistActive = !_initialPlaylistActive;
+    _changingPlaylist = false;
+  }
+
   // Download the media given and initialize the first media.
-  Future<void> _prepareMedia() async {
+  Future<void> _prepareMedia(List<MediaLink> links) async {
     try {
       // If on web give back just the links, 
       //  otherwise download media.
       _mediaLinks = kIsWeb == true
-          ? List.of(mediaLinks)
-          : await _mediaDownloader.downloadAllMedia(links: mediaLinks);
+          ? List.of(links)
+          : await _mediaDownloader.downloadAllMedia(links: links);
       _isPreparingMedia = false;
       if (mounted) setState(() {});
       await _initializeMedia();
@@ -79,7 +90,9 @@ class _VideoAppState extends State<VideoApp> {
   //  (set timer for image and set controller for video)
   Future<void> _initializeMedia() async {
     final media = _currentMedia;
-    if (media == null) return;
+    if (media == null) {
+      return;
+    }
     if (media.type == 'image') {
       _imagePath = kIsWeb ? null : media.link;
 
@@ -91,7 +104,6 @@ class _VideoAppState extends State<VideoApp> {
       );
       return;
     }
-
     
     _checkForWebBrowser();
 
@@ -165,6 +177,10 @@ class _VideoAppState extends State<VideoApp> {
     _imagePath = null;
     _videoPath = null;
     _isChangingVideo = false;
+    if (_changingPlaylist) {
+      unawaited(_startNextPlaylist());
+      return;
+    }
     await _initializeMedia();
   }
 
@@ -179,6 +195,11 @@ class _VideoAppState extends State<VideoApp> {
           children: [
             Center(child: _buildMedia()),
             _buildStartButton(),
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: _buildNextPlaylistButton(),
+            ),
             if (kIsWeb)
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -227,7 +248,17 @@ class _VideoAppState extends State<VideoApp> {
       );
     }
 
+    if (_mediaLinks.isEmpty) {
+      return Image.asset(
+        'assets/placeholder.png',
+        fit: BoxFit.contain,
+        height: double.infinity,
+        width: double.infinity,
+      );
+    }
+
     final media = _currentMedia!;
+
     if (media.type == 'image') {
       if (kIsWeb) {
         return Image.network(
@@ -285,6 +316,34 @@ class _VideoAppState extends State<VideoApp> {
               label: const Text('Start'),
             )
           : const SizedBox.shrink(key: ValueKey('hidden-button')),
+    );
+  }
+
+  // Button to play next playlist for testing
+  Widget _buildNextPlaylistButton() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      transitionBuilder: (child, animation) => ScaleTransition(
+        scale: animation,
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+      child:
+        FloatingActionButton.extended(
+          key: const ValueKey('sample-button'),
+          backgroundColor: const Color.fromARGB(98, 59, 128, 255),
+          hoverColor: const Color.fromARGB(97, 45, 119, 255),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          onPressed: () {
+            setState(() {
+              // Add _startNextPlaylist based on mediaLinksExtra
+              _changingPlaylist = true;
+              if (_mediaLinks.isEmpty) _startNextPlaylist();
+            });
+          },
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Next'),
+        )
     );
   }
 
