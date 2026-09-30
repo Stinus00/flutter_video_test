@@ -115,11 +115,6 @@ class MediaDownloader {
     }
   }
 
-  // Get file extension from link
-  String _fileExtension(String link) {
-    return link.substring(link.lastIndexOf(".") + 1);
-  }
-
   // Check if video is a link
   bool _checkHttp(String link) {
     return link.contains('http');
