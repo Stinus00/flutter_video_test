@@ -39,39 +39,39 @@ import 'media_link.dart';
 //   ),
 // ];
 
-// // Images Only
-// const List<MediaLink> mediaLinks = [
-//   MediaLink(
-//     link: 'http://broken/link', 
-//     type: "image",
-//     duration: 5000.0
-//   ),
-//   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%206.png', 
-//     type: "image",
-//     duration: 7000.0
-//   ),
-//   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%207.png', 
-//     type: "image",
-//     duration: 6000.0
-//   ),
-//   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/tania-mousinho-YlpfE9uCakE-unsplash.jpg', 
-//     type: "image",
-//     duration: 2000.0
-//   ),
-//   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/timo-volz-ZlFKIG6dApg-unsplash.jpg', 
-//     type: "image",
-//     duration: 10000.0
-//   ),
-//   MediaLink(
-//     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg', 
-//     type: "image",
-//     duration: 5000.0
-//   ),
-// ];
+// Images Only
+const List<MediaLink> mediaLinks = [
+  MediaLink(
+    link: 'http://broken/link', 
+    type: "image",
+    duration: 5000.0
+  ),
+  MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%206.png', 
+    type: "image",
+    duration: 7000.0
+  ),
+  MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%207.png', 
+    type: "image",
+    duration: 6000.0
+  ),
+  MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/tania-mousinho-YlpfE9uCakE-unsplash.jpg', 
+    type: "image",
+    duration: 2000.0
+  ),
+  MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/timo-volz-ZlFKIG6dApg-unsplash.jpg', 
+    type: "image",
+    duration: 10000.0
+  ),
+  MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg', 
+    type: "image",
+    duration: 5000.0
+  ),
+];
 
 // // Video's Only
 // const List<MediaLink> mediaLinks = [
@@ -129,8 +129,7 @@ import 'media_link.dart';
 //   // ),
 // ];
 
-// Empty
-const List <MediaLink> mediaLinks = [
+const List <MediaLink> mediaLinks1 = [
   // Broken video
   // MediaLink(
   //   link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/Neil%20Diamond%20-%20Sweet%20Caroline%20%28Live%201969%29.mp4',
@@ -142,7 +141,7 @@ const List <MediaLink> mediaLinks = [
   ),
 ];
 
-const List<MediaLink> mediaLinksExtra = [
+const List<MediaLink> mediaLinks2 = [
   MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/videos/d69268db-64a3-4412-94f2-069b99e8aa91/samba.mp4',
     type: 'video',

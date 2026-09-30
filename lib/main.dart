@@ -22,10 +22,12 @@ class VideoApp extends StatefulWidget {
 
 class _VideoAppState extends State<VideoApp> {
   final MediaDownloader _mediaDownloader = MediaDownloader();
+
   List<MediaLink> _mediaLinks = [];
+  List<List<MediaLink>> _allLists = [];
 
   // Testing
-  bool _initialPlaylistActive = true;
+  final List<List<MediaLink>> _lists = [mediaLinks, mediaLinks1, mediaLinks2];
 
   String? _imagePath;
   String? _videoPath;
@@ -38,6 +40,7 @@ class _VideoAppState extends State<VideoApp> {
   bool _changingPlaylist = false;
   String? _preloadError;
   int _currentLinkIndex = 0;
+  int _currentListIndex = 0;
 
   Browser? _browser;
 
@@ -48,7 +51,7 @@ class _VideoAppState extends State<VideoApp> {
   void initState() {
     super.initState();
     unawaited(WakelockPlus.enable());
-    unawaited(_prepareMedia(mediaLinks));
+    unawaited(_prepareMedia());
   }
 
   // Check which webbrowser the user is using
@@ -58,21 +61,15 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
-  Future<void> _startNextPlaylist() async {
-    _currentLinkIndex = 0;
-    _prepareMedia( _initialPlaylistActive ? mediaLinksExtra : mediaLinks);
-    _initialPlaylistActive = !_initialPlaylistActive;
-    _changingPlaylist = false;
-  }
-
   // Download the media given and initialize the first media.
-  Future<void> _prepareMedia(List<MediaLink> links) async {
+  Future<void> _prepareMedia() async {
     try {
+      _allLists = kIsWeb == true
+        ? List.of(List.of(mediaLinks as Iterable<List<MediaLink>>))
+        : await _mediaDownloader.downloadAllLists(lists: _lists);
       // If on web give back just the links, 
       //  otherwise download media.
-      _mediaLinks = kIsWeb == true
-          ? List.of(links)
-          : await _mediaDownloader.downloadAllMedia(links: links);
+      _mediaLinks = _allLists[0];
       _isPreparingMedia = false;
       if (mounted) setState(() {});
       await _initializeMedia();
@@ -83,6 +80,20 @@ class _VideoAppState extends State<VideoApp> {
         _preloadError = error.toString();
       });
     }
+  }
+
+  Future<void> _startNextPlaylist() async {
+    _currentLinkIndex = 0;
+    _getNextList();
+    // _prepareMedia( _initialPlaylistActive ? mediaLinksExtra : mediaLinks);
+    // _initialPlaylistActive = !_initialPlaylistActive;
+    _changingPlaylist = false;
+    await _initializeMedia();
+  }
+
+  void _getNextList() {
+    _currentListIndex = (_currentListIndex + 1) % _allLists.length;
+    _mediaLinks = _allLists[_currentListIndex];
   }
 
   // Check if first media is image or video

@@ -10,8 +10,22 @@ class MediaDownloader {
 
   final Dio _dio;
 
+  Future<List<List<MediaLink>>> downloadAllLists({
+    required List<List<MediaLink>> lists,
+  }) async {
+    final downloadedLists = <List<MediaLink>>[];
+
+    for (final list in lists) {
+      final dList = await _downloadAllMedia(links: list);
+
+      downloadedLists.add(dList);
+    }
+
+    return downloadedLists;
+  }
+
   // Download all media gathered from media_sources
-  Future<List<MediaLink>> downloadAllMedia({
+  Future<List<MediaLink>> _downloadAllMedia({
     required List<MediaLink> links,
   }) async {
     final downloadedLinks = <MediaLink>[];
