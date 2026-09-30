@@ -60,7 +60,7 @@ class _VideoAppState extends State<VideoApp> {
 
   Future<void> _startNextPlaylist() async {
     _currentLinkIndex = 0;
-    _prepareMedia( _initialPlaylistActive == true ? mediaLinksExtra : mediaLinks);
+    _prepareMedia( _initialPlaylistActive ? mediaLinksExtra : mediaLinks);
     _initialPlaylistActive = !_initialPlaylistActive;
     _changingPlaylist = false;
   }
@@ -225,8 +225,6 @@ class _VideoAppState extends State<VideoApp> {
       return const CircularProgressIndicator();
     }
     if (_preloadError != null) {
-      // _skipMedia();
-
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -336,7 +334,6 @@ class _VideoAppState extends State<VideoApp> {
           elevation: 0,
           onPressed: () {
             setState(() {
-              // Add _startNextPlaylist based on mediaLinksExtra
               _changingPlaylist = true;
               if (_mediaLinks.isEmpty) _startNextPlaylist();
             });
