@@ -138,6 +138,14 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  // Skip current media because of error
+  // // Remove media from list
+  void _skipMedia() {
+    _mediaLinks.removeAt(_currentLinkIndex);
+    _currentLinkIndex -= 1;
+    _playNextMedia();
+  }
+
   // Play next media.
   // // Stop image timer if there is one
   // // Remove controller if there is one
@@ -196,6 +204,8 @@ class _VideoAppState extends State<VideoApp> {
       return const CircularProgressIndicator();
     }
     if (_preloadError != null) {
+      // _skipMedia();
+
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
@@ -206,6 +216,8 @@ class _VideoAppState extends State<VideoApp> {
     }
 
     if (_videoError != null) {
+      _skipMedia();
+
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
