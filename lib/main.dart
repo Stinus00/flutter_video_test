@@ -71,7 +71,6 @@ class _VideoAppState extends State<VideoApp> {
         _isPreparingMedia = false;
         _preloadError = error.toString();
       });
-      _skipMedia();
     }
   }
 
@@ -125,7 +124,6 @@ class _VideoAppState extends State<VideoApp> {
       setState(() {
         _videoError = error.toString();
       });
-      _skipMedia();
     }
   }
 
@@ -206,7 +204,7 @@ class _VideoAppState extends State<VideoApp> {
       return const CircularProgressIndicator();
     }
     if (_preloadError != null) {
-      _skipMedia();
+      // _skipMedia();
 
       return Padding(
         padding: const EdgeInsets.all(24),

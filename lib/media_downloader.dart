@@ -21,6 +21,10 @@ class MediaDownloader {
           ? await _downloadImage(link: media.link)
           : await _downloadVideo(link: media.link);
 
+      if(path == '') {
+        continue;
+      }
+
       downloadedLinks.add(
         MediaLink(
           link: path,
@@ -43,13 +47,17 @@ class MediaDownloader {
     final imageDirectory = Directory('${directory.path}/images');
     final file = File('${imageDirectory.path}/$name.jpg');
 
-    if (!await file.exists()) {
-      await imageDirectory.create(recursive: true);
-      await _dio.download(
-        link,
-        file.path,
-        onReceiveProgress: onReceiveProgress,
-      );
+    try {
+      if (!await file.exists()) {
+        await imageDirectory.create(recursive: true);
+        await _dio.download(
+          link,
+          file.path,
+          onReceiveProgress: onReceiveProgress,
+        );
+      }
+    } catch (e) {
+      return '';
     }
 
     return file.path;
@@ -75,13 +83,17 @@ class MediaDownloader {
       return file.path;
     }
 
-    if (!await file.exists()) {
-      await videoDirectory.create(recursive: true);
-      await _dio.download(
-        link,
-        file.path,
-        onReceiveProgress: onReceiveProgress,
-      );
+    try {
+      if (!await file.exists()) {
+        await videoDirectory.create(recursive: true);
+        await _dio.download(
+          link,
+          file.path,
+          onReceiveProgress: onReceiveProgress,
+        );
+      }
+    } catch (e) {
+      return '';
     }
 
     return file.path;
