@@ -5,6 +5,10 @@ import 'media_link.dart';
 // CHANGE LATER.
 const List<MediaLink> mediaLinks = [
   MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/reclame%20film%20%2302.mp4', 
+    type: "video",
+  ),
+  MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/Whats-On-Instagram-Post-2-1.jpg',
     type: 'image',
     duration: 5000.0,
@@ -14,16 +18,16 @@ const List<MediaLink> mediaLinks = [
     type: 'image',
     duration: 5000.0,
   ),
-    MediaLink(
-    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/reclame%20film%20%2304.mp4',
-    type: 'video',
-  ),
+  //   MediaLink(
+  //   link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/reclame%20film%20%2304.mp4',
+  //   type: 'video',
+  // ),
   MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/208445601-besneeuwde-lekkernijen-kerst-winter-achtergrond-met-sneeuwpop-en-wazig-bokeh-prettige-kerstdagen.jpg',
     type: 'image',
     duration: 5000.0,
   ),
-    MediaLink(
+  MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/Happyhour%20Sep2023_L.mp4',
     type: 'video',
   ),

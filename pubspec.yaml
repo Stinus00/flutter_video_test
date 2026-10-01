@@ -10,6 +10,7 @@ dependencies:
   dio: ^5.11.1
   flutter:
     sdk: flutter
+  flutter_cache_manager: ^3.4.5
   html: ^0.15.7
   http: ^1.6.0
   idb_shim: ^2.9.9

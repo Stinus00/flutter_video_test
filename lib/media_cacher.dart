@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_video_test/media_link.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import 'dart:developer';
 import 'dart:js_interop';
@@ -22,15 +23,13 @@ class MediaCacher {
 
     _db = await _factory!.open(
       'media_cache',
-      version: 1,
+      version: 2,
       onUpgradeNeeded: (VersionChangeEvent e) {
         final db = e.database;
-        if (!db.objectStoreNames.contains('videos')) {
-          db.createObjectStore(
-            'videos',
-            autoIncrement: true,
-          );
+        if (db.objectStoreNames.contains('videos')) {
+          db.deleteObjectStore('videos');
         }
+        db.createObjectStore('videos');
         if (!db.objectStoreNames.contains('images')) {
           db.createObjectStore(
             'images',
@@ -48,6 +47,7 @@ class MediaCacher {
     required List<MediaLink> links,
   }) async {
     final downloadedLinks = <MediaLink>[];
+    DefaultCacheManager().emptyCache();
 
     for (final media in links) {
       final path = media.type == 'image'
@@ -83,14 +83,21 @@ class MediaCacher {
   }
 
   // Turn the bytes into a blob.
-  Future<String> _createBlobUrl(Uint8List bytes) async {
+  Future<String> _createBlobUrl(
+    Uint8List bytes, {
+    String contentType = 'video/mp4',
+  }) async {
     final blob = web.Blob(
       [bytes.toJS].toJS,
-      web.BlobPropertyBag(type: 'video/mp4'),
+      web.BlobPropertyBag(type: contentType),
     );
 
     return web.URL.createObjectURL(blob);
   }
+
+  // Future<void> _revokeBlobUrl(String blobUrl) async {
+  //   web.URL.revokeObjectURL(blobUrl);
+  // }
 
   // Put video into IndexedDB
   // // Change to download to cache. 
@@ -104,35 +111,56 @@ class MediaCacher {
     // If exists skip download part
     if(await containsVideoWeb(videoId)) {
       final bytes = await getVideoWeb(videoId);
-      if(bytes != null) {
-        final blob = _createBlobUrl(bytes);
-        return blob;
+      if (bytes != null && bytes.isNotEmpty) {
+        return videoId;
       }
     }
 
-    // Get video in bytes
-    final response = await Dio().get<List<int>>(
-      url,
-      options: Options(responseType: ResponseType.bytes), // Set the response type to `bytes`.
-    );
+    try{
+      // Get video in bytes
+      final response = await Dio().get<List<int>>(
+        url,
+        options: Options(responseType: ResponseType.bytes), // Set the response type to `bytes`.
+      );
 
-    if (response.statusCode != 200 || response.data == null) {
-      throw Exception('[media_downloader.dart] Failed to download video');
+      if (response.statusCode != 200 || response.data == null) {
+        throw Exception('[media_downloader.dart] Failed to download video');
+      }
+
+      final bytes = Uint8List.fromList(response.data!);
+
+      final db = await database;
+
+      final txn = db.transaction('videos', idbModeReadWrite);
+      final store = txn.objectStore('videos');
+
+      await store.put({'bytes': bytes}, videoId);
+
+      await txn.completed;
+    } catch(e) {
+      log('Error caching video: $e');
+      rethrow;
     }
 
-    final bytes = Uint8List.fromList(response.data!);
+    return videoId; // Return the video ID for retrieval later
+  }
 
-    final db = await database;
-
-    final txn = db.transaction('videos', idbModeReadWrite);
-    final store = txn.objectStore('videos');
-
-    final key = await store.add({'id': videoId, 'bytes': bytes});
-    final video = await store.getObject(key);
-
-    await txn.completed;
+  Future<String> loadBlobUrlFromIndexedDB(String id) async {
+    final bytes = await getVideoWeb(id);
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Video bytes are missing or empty in IndexedDB for "$id".');
+    }
 
     return _createBlobUrl(bytes);
+  }
+
+  Future<String> loadImageBlobUrlFromIndexedDB(String id) async {
+    final bytes = await getImageWeb(id);
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Image bytes are missing or empty in IndexedDB for "$id".');
+    }
+
+    return _createBlobUrl(bytes, contentType: '');
   }
 
   // Get video from IndexedDB
@@ -144,14 +172,15 @@ class MediaCacher {
       idbModeReadOnly,
     );
 
-    final value = await transaction.objectStore('videos').getObject(id);
+    final record = await transaction.objectStore('videos').getObject(id);
 
     await transaction.completed;
 
-    if (value == null) {
+    if (record is! Map) {
       return null;
     }
 
+    final value = record['bytes'];
     if (value is Uint8List) {
       return value;
     }
@@ -204,8 +233,7 @@ class MediaCacher {
     if(await containsImageWeb(imageId)) {
       final bytes = await getImageWeb(imageId);
       if(bytes != null) {
-        final blob = _createBlobUrl(bytes);
-        return blob;
+        return imageId;
       }
     }
 
@@ -226,14 +254,11 @@ class MediaCacher {
     final txn = db.transaction('images', idbModeReadWrite);
     final store = txn.objectStore('images');
 
-    final key = await store.put({'id': imageId, 'bytes': bytes});
-    final image = await store.getObject(key);
+    await store.put({'bytes': bytes}, imageId);
 
     await txn.completed;
 
-    log(await _createBlobUrl(bytes));
-
-    return await _createBlobUrl(bytes);
+    return imageId; // Return the image ID for retrieval later
   }
 
   // Get image from IndexedDB
@@ -245,14 +270,15 @@ class MediaCacher {
       idbModeReadOnly,
     );
 
-    final value = await transaction.objectStore('images').getObject(id);
+    final record = await transaction.objectStore('images').getObject(id);
 
     await transaction.completed;
 
-    if (value == null) {
+    if (record is! Map) {
       return null;
     }
 
+    final value = record['bytes'];
     if (value is Uint8List) {
       return value;
     }

@@ -7,6 +7,7 @@ import 'package:flutter_video_test/media_cacher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_browser_detect/web_browser_detect.dart';
+import 'package:web/web.dart' as web;
 
 import 'media_downloader.dart';
 import 'media_link.dart';
@@ -26,10 +27,16 @@ class _VideoAppState extends State<VideoApp> {
   final MediaCacher _mediaCacher = MediaCacher();
   List<MediaLink> _mediaLinks = [];
 
+  // Testing, delete later
+  Uint8List? _newVideoData = Uint8List(0);
+  Uint8List? _oldVideoData = Uint8List(0);
+
   String? _imagePath;
   String? _videoPath;
+  String? _activeBlobUrl;
   VideoPlayerController? _controller;
   Timer? _imageTimer;
+  String? _imageError;
   String? _videoError;
   bool _isChangingVideo = false;
   bool _hasStartedPlayback = false;
@@ -83,7 +90,27 @@ class _VideoAppState extends State<VideoApp> {
     final media = _currentMedia;
     if (media == null) return;
     if (media.type == 'image') {
-      _imagePath = kIsWeb ? null : media.link;
+      if (kIsWeb) {
+        try {
+          final blobUrl = await _mediaCacher.loadImageBlobUrlFromIndexedDB(
+            media.link,
+          );
+          if (!mounted) {
+            web.URL.revokeObjectURL(blobUrl);
+            return;
+          }
+          _imagePath = blobUrl;
+          _activeBlobUrl = _imagePath;
+        } catch (error) {
+          if (!mounted) return;
+          setState(() {
+            _imageError = error.toString();
+          });
+          return;
+        }
+      } else {
+        _imagePath = media.link;
+      }
 
       if (!mounted) return;
       setState(() {});
@@ -92,7 +119,6 @@ class _VideoAppState extends State<VideoApp> {
       }
       return;
     }
-
     
     _checkForWebBrowser();
 
@@ -103,7 +129,23 @@ class _VideoAppState extends State<VideoApp> {
       _videoPath = media.link;
       controller = VideoPlayerController.file(File(_videoPath!));
     } else {
-      controller = VideoPlayerController.networkUrl(Uri.parse(media.link));
+      try {
+        final blobUrl = await _mediaCacher.loadBlobUrlFromIndexedDB(media.link);
+        if (!mounted) {
+          web.URL.revokeObjectURL(blobUrl);
+          return;
+        }
+        _activeBlobUrl = blobUrl;
+        _videoPath = blobUrl;
+        controller = VideoPlayerController.networkUrl(Uri.parse(blobUrl));
+      } catch (error) {
+        revokeBlobUrl();
+        if (!mounted) return;
+        setState(() {
+          _videoError = "$error\nid: ${media.link}\ntype: ${media.type}";
+        });
+        return;
+      }
     }
 
     _controller = controller;
@@ -121,9 +163,10 @@ class _VideoAppState extends State<VideoApp> {
       setState(() {});
     } catch (error) {
       await controller.dispose();
+      revokeBlobUrl();
       if (!mounted) return;
       setState(() {
-        _videoError = error.toString();
+        _videoError = "$error\nid: ${media.link}\ntype: ${media.type}\ncontroller: ${controller.value}";
       });
     }
   }
@@ -160,13 +203,24 @@ class _VideoAppState extends State<VideoApp> {
     final controller = _controller;
     controller?.removeListener(_handleVideoState);
     await controller?.dispose();
+    revokeBlobUrl();
+    if (!mounted) return;
     _controller = null;
     _currentLinkIndex = (_currentLinkIndex + 1) % _mediaLinks.length;
     _videoError = null;
+    _imageError = null;
     _imagePath = null;
     _videoPath = null;
     _isChangingVideo = false;
     await _initializeMedia();
+  }
+
+  void revokeBlobUrl() {
+    final blobUrl = _activeBlobUrl;
+    if (blobUrl == null) return;
+
+    web.URL.revokeObjectURL(blobUrl);
+    _activeBlobUrl = null;
   }
 
   // Widget to display the app
@@ -223,16 +277,27 @@ class _VideoAppState extends State<VideoApp> {
         ),
       );
     }
+    if (_imageError != null) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Could not load image:\n$_imageError',
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
 
     final media = _currentMedia!;
     if (media.type == 'image') {
       if (kIsWeb) {
-        return Image.network(
-          media.link,
-          fit: BoxFit.contain,
-          height: double.infinity,
-          width: double.infinity,
-        );
+        return _imagePath == null
+            ? const CircularProgressIndicator()
+            : Image.network(
+                _imagePath!,
+                fit: BoxFit.contain,
+                height: double.infinity,
+                width: double.infinity,
+              );
       }
       return _imagePath == null
           ? const CircularProgressIndicator()
@@ -296,7 +361,12 @@ class _VideoAppState extends State<VideoApp> {
   @override
   void dispose() {
     _imageTimer?.cancel();
-    _controller?.dispose();
+    final controller = _controller;
+    if (controller != null) {
+      unawaited(controller.dispose().whenComplete(revokeBlobUrl));
+    } else {
+      revokeBlobUrl();
+    }
     unawaited(WakelockPlus.disable());
     super.dispose();
   }
