@@ -96,6 +96,10 @@ class MediaCacher {
     return web.URL.createObjectURL(blob);
   }
 
+  void revokeBlobUrl(String blobUrl) {
+    web.URL.revokeObjectURL(blobUrl);
+  }
+
   // Put video into IndexedDB
   // // Change to download to cache. 
   // // Out of memory issue encountered on Firestick.

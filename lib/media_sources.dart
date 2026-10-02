@@ -9,6 +9,10 @@ const List<MediaLink> mediaLinks = [
     type: "video",
   ),
   MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/reclame%20film%20%2301.mp4',
+    type: 'video',
+  ),
+  MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/Whats-On-Instagram-Post-2-1.jpg',
     type: 'image',
     duration: 5000.0,
@@ -48,10 +52,6 @@ const List<MediaLink> mediaLinks = [
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/beertje.jpg', 
     type: "image",
     duration: 5000.0
-  ),
-  MediaLink(
-    link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/reclame%20film%20%2301.mp4',
-    type: 'video',
   ),
 ];
 

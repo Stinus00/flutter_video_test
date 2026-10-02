@@ -3,12 +3,12 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_video_test/media_cacher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_browser_detect/web_browser_detect.dart';
-import 'package:web/web.dart' as web;
 
+import 'media_cacher_stub.dart'
+  if (dart.library.js_interop) 'media_cacher.dart';
 import 'media_downloader.dart';
 import 'media_link.dart';
 import 'media_sources.dart';
@@ -32,6 +32,13 @@ class _VideoAppState extends State<VideoApp> {
   String? _videoPath;
   String? _activeBlobUrl;
   VideoPlayerController? _controller;
+  String? _nextImagePath;
+  ImageProvider? _nextImageProvider;
+  VideoPlayerController? _nextController;
+  String? _nextBlobUrl;
+  int? _nextPreparedIndex;
+  int? _nextPreparationIndex;
+  Future<void>? _nextPreparation;
   Timer? _imageTimer;
   String? _imageError;
   String? _videoError;
@@ -55,7 +62,7 @@ class _VideoAppState extends State<VideoApp> {
 
   // Check which webbrowser the user is using
   void _checkForWebBrowser() {
-    if(kIsWeb) {
+    if (kIsWeb) {
       _browser = Browser.detectOrNull();
     }
   }
@@ -63,7 +70,7 @@ class _VideoAppState extends State<VideoApp> {
   // Download the media given and initialize the first media.
   Future<void> _prepareMedia() async {
     try {
-      // If on web give back just the links, 
+      // If on web give back just the links,
       //  otherwise download media.
       _mediaLinks = kIsWeb == true
           ? await _mediaCacher.cacheAllMedia(links: mediaLinks)
@@ -93,7 +100,7 @@ class _VideoAppState extends State<VideoApp> {
             media.id!,
           );
           if (!mounted) {
-            web.URL.revokeObjectURL(blobUrl);
+            _mediaCacher.revokeBlobUrl(blobUrl);
             return;
           }
           _imagePath = blobUrl;
@@ -108,6 +115,7 @@ class _VideoAppState extends State<VideoApp> {
         }
       } else {
         _imagePath = media.link;
+        _activeImageProvider = FileImage(File(media.link));
       }
 
       if (!mounted) return;
@@ -115,9 +123,10 @@ class _VideoAppState extends State<VideoApp> {
       if (!kIsWeb || _hasStartedPlayback) {
         _startImageTimer(media);
       }
+      unawaited(_prepareNextMedia());
       return;
     }
-    
+
     _checkForWebBrowser();
 
     // Use file path if not on web and
@@ -128,9 +137,11 @@ class _VideoAppState extends State<VideoApp> {
       controller = VideoPlayerController.file(File(_videoPath!));
     } else {
       try {
-        final blobUrl = await _mediaCacher.loadVideoBlobUrlFromIndexedDB(media.id!);
+        final blobUrl = await _mediaCacher.loadVideoBlobUrlFromIndexedDB(
+          media.id!,
+        );
         if (!mounted) {
-          web.URL.revokeObjectURL(blobUrl);
+          _mediaCacher.revokeBlobUrl(blobUrl);
           return;
         }
         _activeBlobUrl = blobUrl;
@@ -159,12 +170,14 @@ class _VideoAppState extends State<VideoApp> {
         await controller.play();
       }
       setState(() {});
+      unawaited(_prepareNextMedia());
     } catch (error) {
       await controller.dispose();
       revokeBlobUrl();
       if (!mounted) return;
       setState(() {
-        _videoError = "$error\nid: ${media.link}\ntype: ${media.type}\ncontroller: ${controller.value}";
+        _videoError =
+            "$error\nid: ${media.link}\ntype: ${media.type}\ncontroller: ${controller.value}";
       });
     }
   }
@@ -193,42 +206,158 @@ class _VideoAppState extends State<VideoApp> {
   // // Remove controller if there is one
   // // Find next link
   Future<void> _playNextMedia() async {
-    if (_mediaLinks.isEmpty) return;
+    if (_mediaLinks.isEmpty || _isChangingVideo) return;
 
     _isChangingVideo = true;
     _imageTimer?.cancel();
     _imageTimer = null;
-    final controller = _controller;
-    controller?.removeListener(_handleVideoState);
-    await controller?.dispose();
-    await _evictActiveImage();
-    revokeBlobUrl();
+    final nextIndex = (_currentLinkIndex + 1) % _mediaLinks.length;
+    if (_mediaLinks.length > 1) {
+      await _prepareNextMedia();
+    }
     if (!mounted) return;
-    _controller = null;
-    _currentLinkIndex = (_currentLinkIndex + 1) % _mediaLinks.length;
+
+    final oldController = _controller;
+    oldController?.removeListener(_handleVideoState);
+    final oldImageProvider = _activeImageProvider;
+    final oldBlobUrl = _activeBlobUrl;
+    final hasPreparedNext = _nextPreparedIndex == nextIndex;
+
+    _currentLinkIndex = nextIndex;
+    if (hasPreparedNext) {
+      _controller = _nextController;
+      _nextController = null;
+      _imagePath = _nextImagePath;
+      _activeImageProvider = _nextImageProvider;
+      _nextImagePath = null;
+      _nextImageProvider = null;
+      _videoPath = _mediaLinks[nextIndex].type == 'video'
+          ? (_nextBlobUrl ?? _mediaLinks[nextIndex].link)
+          : null;
+      _activeBlobUrl = _nextBlobUrl;
+      _nextBlobUrl = null;
+      _nextPreparedIndex = null;
+    } else {
+      _controller = null;
+      _imagePath = null;
+      _activeImageProvider = null;
+      _videoPath = null;
+      _activeBlobUrl = null;
+    }
+
+    await oldController?.dispose();
+    if (oldImageProvider != null) await oldImageProvider.evict();
+    if (oldBlobUrl != null) _mediaCacher.revokeBlobUrl(oldBlobUrl);
+
     _videoError = null;
     _imageError = null;
-    _imagePath = null;
-    _videoPath = null;
     _isChangingVideo = false;
+    if (!mounted) return;
+    setState(() {});
+
+    if (hasPreparedNext) {
+      final media = _currentMedia!;
+      if (media.type == 'image') {
+        if (!kIsWeb || _hasStartedPlayback) {
+          _startImageTimer(media);
+        }
+      } else {
+        final controller = _controller!;
+        controller.addListener(_handleVideoState);
+        if (!kIsWeb || _hasStartedPlayback) {
+          await controller.play();
+        }
+      }
+      unawaited(_prepareNextMedia());
+      return;
+    }
+
     await _initializeMedia();
+  }
+
+  Future<void> _prepareNextMedia() async {
+    if (_mediaLinks.length < 2) return;
+
+    final nextIndex = (_currentLinkIndex + 1) % _mediaLinks.length;
+    final currentMedia = _currentMedia;
+    final nextMedia = _mediaLinks[nextIndex];
+    if (currentMedia?.type == 'video' && nextMedia.type == 'video') return;
+
+    if (_nextPreparedIndex == nextIndex) return;
+    if (_nextPreparationIndex == nextIndex && _nextPreparation != null) {
+      await _nextPreparation;
+      return;
+    }
+
+    _nextPreparationIndex = nextIndex;
+    final preparation = _loadNextMedia(nextIndex);
+    _nextPreparation = preparation;
+    try {
+      await preparation;
+    } finally {
+      if (identical(_nextPreparation, preparation)) {
+        _nextPreparation = null;
+        _nextPreparationIndex = null;
+      }
+    }
+  }
+
+  Future<void> _loadNextMedia(int index) async {
+    final media = _mediaLinks[index];
+    String? blobUrl;
+    ImageProvider? imageProvider;
+    VideoPlayerController? controller;
+
+    try {
+      if (media.type == 'image') {
+        if (kIsWeb) {
+          blobUrl = await _mediaCacher.loadImageBlobUrlFromIndexedDB(media.id!);
+          imageProvider = NetworkImage(blobUrl);
+        } else {
+          imageProvider = FileImage(File(media.link));
+        }
+        await precacheImage(imageProvider, context);
+        if (!mounted) {
+          await imageProvider.evict();
+          if (blobUrl != null) _mediaCacher.revokeBlobUrl(blobUrl);
+          return;
+        }
+        _nextImagePath = blobUrl ?? media.link;
+        _nextImageProvider = imageProvider;
+      } else {
+        if (kIsWeb) {
+          blobUrl = await _mediaCacher.loadVideoBlobUrlFromIndexedDB(media.id!);
+          controller = VideoPlayerController.networkUrl(Uri.parse(blobUrl));
+        } else {
+          controller = VideoPlayerController.file(File(media.link));
+        }
+        await controller.setLooping(false);
+        controller.value = controller.value.copyWith(volume: 0.0);
+        await controller.initialize();
+        if (!mounted) {
+          await controller.dispose();
+          if (blobUrl != null) _mediaCacher.revokeBlobUrl(blobUrl);
+          return;
+        }
+        _nextController = controller;
+      }
+
+      _nextBlobUrl = blobUrl;
+      _nextPreparedIndex = index;
+    } catch (error) {
+      await controller?.dispose();
+      if (imageProvider != null) await imageProvider.evict();
+      if (blobUrl != null) _mediaCacher.revokeBlobUrl(blobUrl);
+      debugPrint('Could not prepare next media: $error');
+    }
   }
 
   void revokeBlobUrl() {
     final blobUrl = _activeBlobUrl;
     if (blobUrl == null) return;
 
-    web.URL.revokeObjectURL(blobUrl);
+    _mediaCacher.revokeBlobUrl(blobUrl);
     _activeBlobUrl = null;
-  }
-
-  Future<void> _evictActiveImage() async {
-    final imageProvider = _activeImageProvider;
-    _activeImageProvider = null;
-    _imagePath = null;
-    if (imageProvider != null) {
-      await imageProvider.evict();
-    }
   }
 
   // Widget to display the app
@@ -297,20 +426,10 @@ class _VideoAppState extends State<VideoApp> {
 
     final media = _currentMedia!;
     if (media.type == 'image') {
-      if (kIsWeb) {
-        return _imagePath == null
-            ? const CircularProgressIndicator()
-            : Image(
-              image: _activeImageProvider!,
-                fit: BoxFit.contain,
-                height: double.infinity,
-                width: double.infinity,
-              );
-      }
-      return _imagePath == null
+      return _activeImageProvider == null
           ? const CircularProgressIndicator()
-          : Image.file(
-              File(_imagePath!),
+          : Image(
+              image: _activeImageProvider!,
               fit: BoxFit.contain,
               height: double.infinity,
               width: double.infinity,
@@ -337,12 +456,13 @@ class _VideoAppState extends State<VideoApp> {
         scale: animation,
         child: FadeTransition(opacity: animation, child: child),
       ),
-      child: _videoError == null &&
+      child:
+          _videoError == null &&
               kIsWeb &&
               !_hasStartedPlayback &&
-                (isImage ||
+              (isImage ||
                   (_controller?.value.isInitialized == true &&
-                    !_controller!.value.isPlaying))
+                      !_controller!.value.isPlaying))
           ? FloatingActionButton.extended(
               key: const ValueKey('sample-button'),
               backgroundColor: const Color.fromARGB(99, 0, 0, 0),
@@ -370,10 +490,17 @@ class _VideoAppState extends State<VideoApp> {
   void dispose() {
     _imageTimer?.cancel();
     final controller = _controller;
+    final nextController = _nextController;
+    final activeImageProvider = _activeImageProvider;
+    final nextImageProvider = _nextImageProvider;
+    final nextBlobUrl = _nextBlobUrl;
     unawaited(() async {
       await controller?.dispose();
-      await _evictActiveImage();
+      await nextController?.dispose();
+      await activeImageProvider?.evict();
+      await nextImageProvider?.evict();
       revokeBlobUrl();
+      if (nextBlobUrl != null) _mediaCacher.revokeBlobUrl(nextBlobUrl);
     }());
     unawaited(WakelockPlus.disable());
     super.dispose();
