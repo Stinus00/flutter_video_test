@@ -59,6 +59,7 @@ class MediaCacher {
           link: path,
           type: media.type,
           duration: media.duration,
+          id: _getTemporaryId(media.link),
         ),
       );
     }
@@ -95,10 +96,6 @@ class MediaCacher {
     return web.URL.createObjectURL(blob);
   }
 
-  // Future<void> _revokeBlobUrl(String blobUrl) async {
-  //   web.URL.revokeObjectURL(blobUrl);
-  // }
-
   // Put video into IndexedDB
   // // Change to download to cache. 
   // // Out of memory issue encountered on Firestick.
@@ -109,10 +106,10 @@ class MediaCacher {
   ) async {
     // Check if video exists
     // If exists skip download part
-    if(await containsVideoWeb(videoId)) {
-      final bytes = await getVideoWeb(videoId);
+    if(await containsMediaWeb('videos', videoId)) {
+      final bytes = await getMediaWeb('videos', videoId);
       if (bytes != null && bytes.isNotEmpty) {
-        return videoId;
+        return url;
       }
     }
 
@@ -142,11 +139,11 @@ class MediaCacher {
       rethrow;
     }
 
-    return videoId; // Return the video ID for retrieval later
+    return url; // Return the video ID for retrieval later
   }
 
-  Future<String> loadBlobUrlFromIndexedDB(String id) async {
-    final bytes = await getVideoWeb(id);
+  Future<String> loadVideoBlobUrlFromIndexedDB(String id) async {
+    final bytes = await getMediaWeb('videos', id);
     if (bytes == null || bytes.isEmpty) {
       throw StateError('Video bytes are missing or empty in IndexedDB for "$id".');
     }
@@ -155,71 +152,12 @@ class MediaCacher {
   }
 
   Future<String> loadImageBlobUrlFromIndexedDB(String id) async {
-    final bytes = await getImageWeb(id);
+    final bytes = await getMediaWeb('images', id);
     if (bytes == null || bytes.isEmpty) {
       throw StateError('Image bytes are missing or empty in IndexedDB for "$id".');
     }
 
     return _createBlobUrl(bytes, contentType: '');
-  }
-
-  // Get video from IndexedDB
-  Future<Uint8List?> getVideoWeb(String id) async {
-    final db = await database;
-
-    final transaction = db.transaction(
-      'videos',
-      idbModeReadOnly,
-    );
-
-    final record = await transaction.objectStore('videos').getObject(id);
-
-    await transaction.completed;
-
-    if (record is! Map) {
-      return null;
-    }
-
-    final value = record['bytes'];
-    if (value is Uint8List) {
-      return value;
-    }
-
-    if (value is List<int>) {
-      return Uint8List.fromList(value);
-    }
-
-    return null;
-  }
-
-  // Check if video exists in IndexedDB
-  Future<bool> containsVideoWeb(String id) async {
-    final db = await database;
-
-    final transaction = db.transaction(
-      'videos',
-      idbModeReadOnly,
-    );
-
-    final value = await transaction.objectStore('videos').getObject(id);
-
-    await transaction.completed;
-
-    return value != null;
-  }
-
-  // Delete video from IndexedDB
-  Future<void> deleteVideoWeb(String id) async {
-    final db = await database;
-
-    final transaction = db.transaction(
-      'videos',
-      idbModeReadWrite,
-    );
-
-    await transaction.objectStore('videos').delete(id);
-
-    await transaction.completed;
   }
 
   // Put image into IndexedDB
@@ -230,10 +168,10 @@ class MediaCacher {
   ) async {
     // Check if image exists in database.
     // If it does skip download part.
-    if(await containsImageWeb(imageId)) {
-      final bytes = await getImageWeb(imageId);
+    if(await containsMediaWeb('images', imageId)) {
+      final bytes = await getMediaWeb('images', imageId);
       if(bytes != null) {
-        return imageId;
+        return url;
       }
     }
 
@@ -258,19 +196,19 @@ class MediaCacher {
 
     await txn.completed;
 
-    return imageId; // Return the image ID for retrieval later
+    return url; // Return the image ID for retrieval later
   }
 
   // Get image from IndexedDB
-  Future<Uint8List?> getImageWeb(String id) async {
+  Future<Uint8List?> getMediaWeb(String store, String id) async {
     final db = await database;
 
     final transaction = db.transaction(
-      'images',
+      store,
       idbModeReadOnly,
     );
 
-    final record = await transaction.objectStore('images').getObject(id);
+    final record = await transaction.objectStore(store).getObject(id);
 
     await transaction.completed;
 
@@ -290,32 +228,32 @@ class MediaCacher {
     return null;
   }
 
-  // Check if image is in IndexedDB
-  Future<bool> containsImageWeb(String id) async {
+  // Check if video exists in IndexedDB
+  Future<bool> containsMediaWeb(String store, String id) async {
     final db = await database;
 
     final transaction = db.transaction(
-      'images',
+      store,
       idbModeReadOnly,
     );
 
-    final value = await transaction.objectStore('images').getObject(id);
+    final record = await transaction.objectStore(store).getObject(id);
 
     await transaction.completed;
 
-    return value != null;
+    return record != null;
   }
 
   // Delete image from IndexedDB
-  Future<void> deleteImageWeb(String id) async {
+  Future<void> deleteMediaWeb(String store, String id) async {
     final db = await database;
 
     final transaction = db.transaction(
-      'images',
+      store,
       idbModeReadWrite,
     );
 
-    await transaction.objectStore('images').delete(id);
+    await transaction.objectStore(store).delete(id);
 
     await transaction.completed;
   }

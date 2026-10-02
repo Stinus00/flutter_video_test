@@ -5,7 +5,7 @@ set -e
 flutter build web
 
 cd build/web
-python3 -m http.server 3000 --bind 0.0.0.0
+python3 -m http.server 8080 --bind 0.0.0.0
 
 cd ../../
 

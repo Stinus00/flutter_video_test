@@ -27,11 +27,8 @@ class _VideoAppState extends State<VideoApp> {
   final MediaCacher _mediaCacher = MediaCacher();
   List<MediaLink> _mediaLinks = [];
 
-  // Testing, delete later
-  Uint8List? _newVideoData = Uint8List(0);
-  Uint8List? _oldVideoData = Uint8List(0);
-
   String? _imagePath;
+  ImageProvider? _activeImageProvider;
   String? _videoPath;
   String? _activeBlobUrl;
   VideoPlayerController? _controller;
@@ -93,13 +90,14 @@ class _VideoAppState extends State<VideoApp> {
       if (kIsWeb) {
         try {
           final blobUrl = await _mediaCacher.loadImageBlobUrlFromIndexedDB(
-            media.link,
+            media.id!,
           );
           if (!mounted) {
             web.URL.revokeObjectURL(blobUrl);
             return;
           }
           _imagePath = blobUrl;
+          _activeImageProvider = NetworkImage(blobUrl);
           _activeBlobUrl = _imagePath;
         } catch (error) {
           if (!mounted) return;
@@ -130,7 +128,7 @@ class _VideoAppState extends State<VideoApp> {
       controller = VideoPlayerController.file(File(_videoPath!));
     } else {
       try {
-        final blobUrl = await _mediaCacher.loadBlobUrlFromIndexedDB(media.link);
+        final blobUrl = await _mediaCacher.loadVideoBlobUrlFromIndexedDB(media.id!);
         if (!mounted) {
           web.URL.revokeObjectURL(blobUrl);
           return;
@@ -142,7 +140,7 @@ class _VideoAppState extends State<VideoApp> {
         revokeBlobUrl();
         if (!mounted) return;
         setState(() {
-          _videoError = "$error\nid: ${media.link}\ntype: ${media.type}";
+          _videoError = "$error\nid: ${media.id}\ntype: ${media.type}";
         });
         return;
       }
@@ -203,6 +201,7 @@ class _VideoAppState extends State<VideoApp> {
     final controller = _controller;
     controller?.removeListener(_handleVideoState);
     await controller?.dispose();
+    await _evictActiveImage();
     revokeBlobUrl();
     if (!mounted) return;
     _controller = null;
@@ -221,6 +220,15 @@ class _VideoAppState extends State<VideoApp> {
 
     web.URL.revokeObjectURL(blobUrl);
     _activeBlobUrl = null;
+  }
+
+  Future<void> _evictActiveImage() async {
+    final imageProvider = _activeImageProvider;
+    _activeImageProvider = null;
+    _imagePath = null;
+    if (imageProvider != null) {
+      await imageProvider.evict();
+    }
   }
 
   // Widget to display the app
@@ -292,8 +300,8 @@ class _VideoAppState extends State<VideoApp> {
       if (kIsWeb) {
         return _imagePath == null
             ? const CircularProgressIndicator()
-            : Image.network(
-                _imagePath!,
+            : Image(
+              image: _activeImageProvider!,
                 fit: BoxFit.contain,
                 height: double.infinity,
                 width: double.infinity,
@@ -362,11 +370,11 @@ class _VideoAppState extends State<VideoApp> {
   void dispose() {
     _imageTimer?.cancel();
     final controller = _controller;
-    if (controller != null) {
-      unawaited(controller.dispose().whenComplete(revokeBlobUrl));
-    } else {
+    unawaited(() async {
+      await controller?.dispose();
+      await _evictActiveImage();
       revokeBlobUrl();
-    }
+    }());
     unawaited(WakelockPlus.disable());
     super.dispose();
   }
