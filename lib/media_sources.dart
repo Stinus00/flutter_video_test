@@ -5,6 +5,16 @@ import 'media_link.dart';
 // CHANGE LATER.
 const List<MediaLink> mediaLinks = [
   MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0053/0053-0007.jpg', 
+    type: "image",
+    duration: 10000.0
+  ),
+  MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/images/49bd4613-aa92-4845-8ee2-82eaf4ea5eb5/dragon.png', 
+    type: "image",
+    duration: 10000.0
+  ),
+  MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/reclame%20film%20%2302.mp4', 
     type: "video",
   ),
