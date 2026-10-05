@@ -22,8 +22,8 @@ class VideoApp extends StatefulWidget {
 }
 
 class _VideoAppState extends State<VideoApp> {
-  final MediaDownloader _mediaDownloader = MediaDownloader();
   final MediaCacher _mediaCacher = MediaCacher();
+  final MediaDownloader _mediaDownloader = MediaDownloader();
   List<MediaLink> _mediaLinks = [];
 
   String? _imagePath;
@@ -59,9 +59,7 @@ class _VideoAppState extends State<VideoApp> {
   // Download the media given and initialize the first media.
   Future<void> _prepareMedia() async {
     try {
-      // If on web give back just the links, 
-      //  otherwise download media.
-      _mediaLinks = kIsWeb == true
+      _mediaLinks = kIsWeb
           ? await _mediaCacher.cacheAllMedia(links: mediaLinks)
           : await _mediaDownloader.downloadAllMedia(links: mediaLinks);
       _isPreparingMedia = false;
