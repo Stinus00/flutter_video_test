@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:ffi';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
@@ -12,16 +12,26 @@ import 'package:intl/intl.dart';
 import 'package:teno_rrule/teno_rrule.dart';
 
 class ApiCall {
-  ApiCall({Dio? dio}) : _dio = dio ?? Dio();
+  ApiCall({Dio? dio, MediaDownloader? downloader})
+    : _dio = dio ?? Dio(),
+      _downloader = downloader ?? MediaDownloader();
 
   final Dio _dio;
-  MediaDownloader _downloader = MediaDownloader();
+  final MediaDownloader _downloader;
+  
+  var _playlistsMap = {};
 
+  // Get data from URL
   Future<String> getMediaFromApi() async {
     try {
       final data = await _getJsonFromUrl();
 
-      _saveApiResponse(data);
+      if(await _compareApiResponses(data))
+      {
+        _loadOldApiResponse();
+        return '';
+      }
+      await _saveApiResponse(data);
 
       List<dynamic> media = [];
 
@@ -34,6 +44,7 @@ class ApiCall {
     }
   }
 
+  // Get JSON from api
   Future<Map<String, dynamic>> _getJsonFromUrl() async {
     try {
       final secrets = await _getSecrets();
@@ -42,7 +53,6 @@ class ApiCall {
       final urlNow = '$url?start=${_getCurrentDate()}';
 
       final response = await _dio.get(urlNow);
-      response.data;
       // await _saveApiResponse(response);
       if (response.statusCode == 200) {
         return response.data;
@@ -55,15 +65,21 @@ class ApiCall {
     }
   }
 
+  // Get the group schedules and return list.
   List<dynamic> _getGroupSchedules(
     List<dynamic> media,
     Map<String, dynamic> data,
   ) {
-    media.addAll(getActiveGroupSchedules(data, now: DateTime.now().toUtc()));
+    media.addAll(_getActiveGroupSchedules(data, now: DateTime.now().toUtc()));
     return media;
   }
 
-  List<dynamic> getActiveGroupSchedules(
+  @visibleForTesting
+  List<dynamic> getActiveGroupSchedules(Map<String, dynamic> data, DateTime? now) {
+    return _getActiveGroupSchedules(data, now: now);
+  }
+
+  List<dynamic> _getActiveGroupSchedules(
     Map<String, dynamic> data, {
     DateTime? now,
   }) {
@@ -75,15 +91,21 @@ class ApiCall {
     }).toList();
   }
 
+  // Get the system schedules and return list
   List<dynamic> _getSystemSchedules(
     List<dynamic> media,
     Map<String, dynamic> data,
   ) {
-    media.addAll(getActiveSystemSchedules(data, now: DateTime.now().toUtc()));
+    media.addAll(_getActiveSystemSchedules(data, now: DateTime.now().toUtc()));
     return media;
   }
 
-  List<dynamic> getActiveSystemSchedules(
+  @visibleForTesting
+  List<dynamic> getActiveSystemSchedules(Map<String, dynamic> data, DateTime? now) {
+    return _getActiveSystemSchedules(data, now: now);
+  }
+
+  List<dynamic> _getActiveSystemSchedules(
     Map<String, dynamic> data, {
     DateTime? now,
   }) {
@@ -95,6 +117,7 @@ class ApiCall {
     }).toList();
   }
 
+  // Get media that will be shown right now.
   bool _createRRule(Map<String, dynamic> slide, {DateTime? now}) {
     final start = DateTime.parse(slide['start'] as String).toUtc();
     final end = DateTime.parse(slide['end'] as String).toUtc();
@@ -138,6 +161,24 @@ class ApiCall {
     });
   }
 
+  Future<void> _mapPlaylists(playlists) async {
+    for (var playlist in playlists) {
+      if (_playlistsMap[playlist['id']] != null) continue;
+
+      _playlistsMap[playlist['id']] = playlist;
+    }
+  }
+
+  Future<void> _getPlaylistData(schedules, data) async {
+    for (var schedule in schedules) {
+      String playlistId = schedule["playlist"]["id"];
+      bool slideShuffle = schedule["slide_shuffle"] == 1;
+
+      data['playlists']['slides'];
+    }
+  }
+
+  // Convert media gotten from API to MediaLink
   List<MediaLink> _convertMediaToMediaLink(List<dynamic> media) {
     List<MediaLink> mediaLinks = [];
     for (var item in media) {
@@ -152,11 +193,23 @@ class ApiCall {
     return mediaLinks;
   }
 
+  // Download all media gotten from API
   void _downloadMedia(List<MediaLink> media) {
     _downloader.downloadAllMedia(links: media);
   }
 
-  void _saveApiResponse(Map<String, dynamic> data) async {
+  @visibleForTesting
+  Future<void> saveApiResponse(Map<String, dynamic> data) {
+    return _saveApiResponse(data);
+  }
+
+  Future<SystemData> _convertToSystemData(Map<String, dynamic> data) async {
+    final system = SystemData.fromJson(data);
+    return system;
+  }
+
+  // Save API response to file for comparison later
+  Future<void> _saveApiResponse(Map<String, dynamic> data) async {
     final directory = await _downloader.downloadDirectory;
     final system = SystemData.fromJson(data);
     final jsonDirectory = Directory('${directory.path}/json');
@@ -166,8 +219,11 @@ class ApiCall {
     await file.writeAsString(jsonString);
   }
 
-  Map<String, dynamic> _loadOldApiResponse() {
-    final file = File('assets/json/api_response.json');
+  // Load old API response from file for comparison
+  Future<Map<String, dynamic>> _loadOldApiResponse() async {
+    final directory = await _downloader.downloadDirectory;
+    final jsonDirectory = Directory('${directory.path}/json');
+    final file = File('${jsonDirectory.path}/old_api_response.json');
     if (!file.existsSync()) {
       throw Exception('Old API response file not found.');
     }
@@ -175,12 +231,21 @@ class ApiCall {
     return jsonDecode(jsonString) as Map<String, dynamic>;
   }
 
-  bool _compareApiResponses(Response newResponse) {
-    final newData = newResponse.data;
-    final oldData = _loadOldApiResponse();
-    return newData == oldData;
+  // Compare old and new response
+  Future<bool> _compareApiResponses(Map<String, dynamic> data) async {
+    final system = SystemData.fromJson(data);
+    final jsonString = const JsonEncoder.withIndent('  ').convert(system.toJson());
+    final newData = jsonDecode(jsonString) as Map<String, dynamic>;
+    final oldData = await _loadOldApiResponse();
+
+    final newDataString = jsonEncode(newData);
+    final oldDataString = jsonEncode(oldData);
+
+    final returnBool = newDataString == oldDataString;
+    return returnBool;
   }
 
+  // Get current date
   String _getCurrentDate() {
     var now = DateTime.now();
     var formatter = DateFormat('yyyy-MM-dd');
@@ -188,6 +253,7 @@ class ApiCall {
     return formattedDate;
   }
 
+  // Get secrets in secrets.json
   Future<dynamic> _getSecrets() async {
     final String jsonString = await rootBundle.loadString(
       'assets/json/secrets.json',
@@ -196,6 +262,7 @@ class ApiCall {
     return jsonDecode(jsonString);
   }
 
+  // Format date for Recurrence Rule
   String _formatDateForRRule(DateTime date) {
     String two(int value) => value.toString().padLeft(2, '0');
 

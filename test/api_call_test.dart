@@ -1,7 +1,18 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_video_test/api_call.dart';
+import 'package:flutter_video_test/media_downloader.dart';
+
+class _TestMediaDownloader extends MediaDownloader {
+  _TestMediaDownloader(this.directory);
+
+  final Directory directory;
+
+  @override
+  Future<Directory> get downloadDirectory async => directory;
+}
 
 const scheduleResponseJson = '''
 {
@@ -97,7 +108,7 @@ void main() {
     test('does not include a schedule', () {
       final activeSlides = apiCall.getActiveGroupSchedules(
         decodeScheduleResponse(),
-        now: DateTime.utc(2026, 10, 6, 9),
+        DateTime.utc(2026, 10, 6, 9),
       );
 
       expect(activeSlides, isEmpty);
@@ -110,7 +121,7 @@ void main() {
     test('includes schedules active during their recurring time window', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        now: DateTime.utc(2026, 10, 6, 9),
+        DateTime.utc(2026, 10, 6, 9),
       );
 
       expect(activeSlides.map((slide) => slide['id']), [1558, 1560]);
@@ -119,7 +130,7 @@ void main() {
     test('excludes recurrence exception dates', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        now: DateTime.utc(2026, 10, 7, 9),
+        DateTime.utc(2026, 10, 7, 9),
       );
 
       expect(activeSlides.map((slide) => slide['id']), [1560]);
@@ -128,7 +139,7 @@ void main() {
     test('does not include a schedule at its end time', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        now: DateTime.utc(2026, 10, 7, 18),
+        DateTime.utc(2026, 10, 7, 18),
       );
 
       expect(activeSlides, isEmpty);
@@ -137,12 +148,12 @@ void main() {
     test('exception moved', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        now: DateTime.utc(2026, 10, 8, 8, 30),
+        DateTime.utc(2026, 10, 8, 8, 30),
       );
 
       final inactiveSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        now: DateTime.utc(2026, 10, 8, 8),
+        DateTime.utc(2026, 10, 8, 8),
       );
 
       expect(activeSlides.map((slide) => slide['id']), [1558, 1561]);
@@ -152,16 +163,55 @@ void main() {
     test('includes a one-off schedule only inside its start/end window', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        now: DateTime.utc(2026, 10, 8, 8, 30),
+        DateTime.utc(2026, 10, 8, 8, 30),
       );
 
       final expiredSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        now: DateTime.utc(2026, 10, 8, 18, 28, 48),
+        DateTime.utc(2026, 10, 8, 18, 28, 48),
       );
 
       expect(activeSlides.map((slide) => slide['id']), [1558, 1561]);
       expect(expiredSlides, isEmpty);
+    });
+  });
+
+  group('saveApiResponse', () {
+    late Directory tempDirectory;
+    late ApiCall apiCall;
+
+    setUp(() async {
+      tempDirectory = await Directory.systemTemp.createTemp(
+        'schedule-save-test-',
+      );
+      apiCall = ApiCall(
+        downloader: _TestMediaDownloader(
+          Directory('${tempDirectory.path}/documents'),
+        ),
+      );
+    });
+
+    tearDown(() async {
+      await tempDirectory.delete(recursive: true);
+    });
+
+    test('saves the schedules from scheduleResponseJson', () async {
+      await apiCall.saveApiResponse(decodeScheduleResponse());
+
+      final savedFile = File(
+        '${tempDirectory.path}/documents/json/old_api_response.json',
+      );
+      expect(await savedFile.exists(), isTrue);
+
+      final savedResponse =
+          jsonDecode(await savedFile.readAsString()) as Map<String, dynamic>;
+      final savedSlides =
+          (savedResponse['system_schedules'] as Map<String, dynamic>)['slides']
+              as List<dynamic>;
+
+      expect(savedSlides.map((slide) => slide['id']), [1558, 1560, 1561]);
+      expect(savedSlides.last['recurrence_rule'], isNull);
+      expect(savedSlides.last['recurrence_exception'], isNull);
     });
   });
 }

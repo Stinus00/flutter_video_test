@@ -247,11 +247,13 @@ class Playlists {
 
 class SlidePlaylist {
   final String id;
+  final String status;
   final List<dynamic> groups;
   final List<SlideItem> slides;
 
   SlidePlaylist({
     required this.id,
+    required this.status,
     required this.groups,
     required this.slides,
   });
@@ -259,6 +261,7 @@ class SlidePlaylist {
   factory SlidePlaylist.fromJson(Map<String, dynamic> json) {
     return SlidePlaylist(
       id: json['id']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
       groups: json['groups'] as List? ?? [],
       slides: (json['slides'] as List? ?? [])
           .map((e) => SlideItem.fromJson(e))
@@ -268,6 +271,7 @@ class SlidePlaylist {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'status': status,
         'groups': groups,
         'slides': slides.map((e) => e.toJson()).toList(),
       };
