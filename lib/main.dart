@@ -10,6 +10,7 @@ import 'package:web_browser_detect/web_browser_detect.dart';
 import 'media_downloader.dart';
 import 'media_link.dart';
 import 'media_sources.dart';
+import 'api_call.dart';
 
 void main() => runApp(const VideoApp());
 
@@ -57,6 +58,8 @@ class _VideoAppState extends State<VideoApp> {
       _browser = Browser.detectOrNull();
     }
   }
+
+  final response = unawaited(ApiCall().getMediaFromApi());
 
   Future<void> _startNextPlaylist() async {
     _currentLinkIndex = 0;

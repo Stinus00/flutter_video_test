@@ -10,6 +10,11 @@ class MediaDownloader {
 
   final Dio _dio;
 
+  Future<Directory> get downloadDirectory async {
+    final directory = await getApplicationDocumentsDirectory();
+    return directory;
+  }
+
   // Download all media gathered from media_sources
   Future<List<MediaLink>> downloadAllMedia({
     required List<MediaLink> links,
@@ -42,7 +47,7 @@ class MediaDownloader {
     required String link,
     void Function(int received, int total)? onReceiveProgress,
   }) async {
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await downloadDirectory;
     final name = _fileName(link);
     final imageDirectory = Directory('${directory.path}/images');
     final file = File('${imageDirectory.path}/$name.jpg');
@@ -69,7 +74,7 @@ class MediaDownloader {
     void Function(int received, int total)? onReceiveProgress,
   }) async {
 
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await downloadDirectory;
     final name = _fileName(link);
     final videoDirectory = Directory('${directory.path}/videos');
     final file = File('${videoDirectory.path}/$name.mp4');
