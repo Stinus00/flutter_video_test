@@ -204,7 +204,7 @@ class ApiCall {
 
   // Convert media gotten from API to MediaLink
   Future<List<MediaLink>> _convertMediaToMediaLink(List<dynamic> media) async {
-
+    // Get mimetype from given mimetype or from link extension
     String getMimeType(String type, item) {
       if(type == 'image') {
         if(item['image']['mime_type']?.isNotEmpty ?? true) {
@@ -229,6 +229,7 @@ class ApiCall {
       return 'video/mp4';
     }
 
+    // Set variables in medialink
     List<MediaLink> mediaLinks = [];
     for (var item in media) {
       final type = item['media_type'];
