@@ -23,6 +23,7 @@ class VideoApp extends StatefulWidget {
 
 class _VideoAppState extends State<VideoApp> {
   final MediaDownloader _mediaDownloader = MediaDownloader();
+  final ApiCall _apiCall = ApiCall();
   List<MediaLink> _mediaLinks = [];
 
   // Testing
@@ -59,8 +60,6 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
-  final response = unawaited(ApiCall().getMediaFromApi());
-
   Future<void> _startNextPlaylist() async {
     _currentLinkIndex = 0;
     _prepareMedia( _initialPlaylistActive ? mediaLinksExtra : mediaLinks);
@@ -70,12 +69,26 @@ class _VideoAppState extends State<VideoApp> {
 
   // Download the media given and initialize the first media.
   Future<void> _prepareMedia(List<MediaLink> links) async {
+    Future<List<MediaLink>> gatherMedia() async {
+      if (_mediaLinks.isEmpty) return await _apiCall.getMediaFromApi();
+
+      bool isSame = await _apiCall.compareApiResponses();
+      if(isSame) {
+        debugPrint('+ Same as last time, skipping...');
+        return _mediaLinks;
+      }
+      debugPrint('- Not same as last time, downloading media.');
+
+      return await _apiCall.getMediaFromApi();
+    }
+
     try {
       // If on web give back just the links, 
       //  otherwise download media.
       _mediaLinks = kIsWeb == true
           ? List.of(links)
-          : await _mediaDownloader.downloadAllMedia(links: links);
+          : await gatherMedia();
+
       _isPreparingMedia = false;
       if (mounted) setState(() {});
       await _initializeMedia();
@@ -97,7 +110,7 @@ class _VideoAppState extends State<VideoApp> {
       return;
     }
     if (media.type == 'image') {
-      _imagePath = kIsWeb ? null : media.link;
+      _imagePath = kIsWeb ? null : media.localPath;
 
       if (!mounted) return;
       setState(() {});
@@ -114,7 +127,7 @@ class _VideoAppState extends State<VideoApp> {
     //  use url if on web.
     VideoPlayerController controller;
     if (!kIsWeb) {
-      _videoPath = media.link;
+      _videoPath = media.localPath;
       controller = VideoPlayerController.file(File(_videoPath!));
     } else {
       controller = VideoPlayerController.networkUrl(Uri.parse(media.link));

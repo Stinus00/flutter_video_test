@@ -196,7 +196,7 @@ void main() {
     });
 
     test('saves the schedules from scheduleResponseJson', () async {
-      await apiCall.saveApiResponse(decodeScheduleResponse());
+      await apiCall.saveApiResponse(jsonEncode(decodeScheduleResponse()));
 
       final savedFile = File(
         '${tempDirectory.path}/documents/json/old_api_response.json',

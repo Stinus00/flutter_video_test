@@ -44,7 +44,7 @@ void main() {
           'playlists': {'slides': [], 'frames': [], 'tickers': []},
         };
 
-        await apiCall.saveApiResponse(data);
+        await apiCall.saveApiResponse(jsonEncode(data));
 
         final file = File(
           '${tempDirectory.path}/documents/json/old_api_response.json',
@@ -62,7 +62,7 @@ void main() {
         });
 
         data['name'] = 'Updated display';
-        await apiCall.saveApiResponse(data);
+        await apiCall.saveApiResponse(jsonEncode(data));
         expect(
           jsonDecode(await file.readAsString())['name'],
           'Updated display',

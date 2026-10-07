@@ -5,6 +5,6 @@ class MediaLink {
   final String link;
   final String type;
   final String? mimeType;
-  final double? duration;
+  final int? duration;
   final String? localPath;
 }

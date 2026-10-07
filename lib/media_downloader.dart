@@ -32,9 +32,12 @@ class MediaDownloader {
 
       downloadedLinks.add(
         MediaLink(
-          link: path,
+          id: media.id,
+          link: media.link,
           type: media.type,
           duration: media.duration,
+          mimeType: media.mimeType,
+          localPath: path,
         ),
       );
     }

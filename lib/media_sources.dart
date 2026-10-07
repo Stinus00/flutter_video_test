@@ -160,16 +160,16 @@ const List<MediaLink> mediaLinksExtra = [
   MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%206.png', 
     type: "image",
-    duration: 7000.0
+    duration: 7000
   ),
   MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/sample%207.png', 
     type: "image",
-    duration: 6000.0
+    duration: 6000
   ),
   MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/tania-mousinho-YlpfE9uCakE-unsplash.jpg', 
     type: "image",
-    duration: 2000.0
+    duration: 2000
   ),
 ];
