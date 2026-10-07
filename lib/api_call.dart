@@ -40,8 +40,8 @@ class ApiCall {
       var playlists = mapJson['playlists']['slides'];
       _mapPlaylists(playlists);
 
-      final groupSchedules = _getGroupSchedules(media, mapJson);
-      final systemSchedules = _getSystemSchedules(media, mapJson);
+      _getGroupSchedules(media, mapJson);
+      _getSystemSchedules(media, mapJson);
 
       _getPlaylistData(media, shuffleList, mainList);
 

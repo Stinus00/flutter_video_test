@@ -7,7 +7,6 @@ import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:web_browser_detect/web_browser_detect.dart';
 
-import 'media_downloader.dart';
 import 'media_link.dart';
 import 'media_sources.dart';
 import 'api_call.dart';
@@ -22,7 +21,6 @@ class VideoApp extends StatefulWidget {
 }
 
 class _VideoAppState extends State<VideoApp> {
-  final MediaDownloader _mediaDownloader = MediaDownloader();
   final ApiCall _apiCall = ApiCall();
   List<MediaLink> _mediaLinks = [];
 
