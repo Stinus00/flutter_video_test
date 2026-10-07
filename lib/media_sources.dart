@@ -5,16 +5,6 @@ import 'media_link.dart';
 // CHANGE LATER.
 const List<MediaLink> mediaLinks = [
   MediaLink(
-    link: 'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0053/0053-0007.jpg', 
-    type: "image",
-    duration: 10000.0
-  ),
-  MediaLink(
-    link: 'https://s3.eu-central-003.backblazeb2.com/production--remote-webapp/images/49bd4613-aa92-4845-8ee2-82eaf4ea5eb5/dragon.png', 
-    type: "image",
-    duration: 10000.0
-  ),
-  MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/reclame%20film%20%2302.mp4', 
     type: "video",
   ),
@@ -49,6 +39,11 @@ const List<MediaLink> mediaLinks = [
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/images/05aac0e9f1269015f0cc65daf450c2a0b3f416f244691e80501582a284573874%20X1%3D1264%20Y1%3D385%20X2%3D2576%20Y2%3D1123.jpg',
     type: 'image',
     duration: 5000.0,
+  ),
+  MediaLink(
+    link: 'https://s3.eu-central-003.backblazeb2.com/bcmdatabucket1/graphics/templateimages_n/0053/0053-0007.jpg', 
+    type: "image",
+    duration: 5000.0
   ),
   MediaLink(
     link: 'https://s3.eu-central-003.backblazeb2.com/bcm-test-stijn/video/Live%20and%20Loud%20L%20Full%20Hd-1.mp4',
