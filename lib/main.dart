@@ -40,6 +40,8 @@ class _VideoAppState extends State<VideoApp> {
   int _currentLinkIndex = 0;
   Timer? _scheduleCheckTimer;
   Timer? _payloadCheckTimer;
+  bool _checkSchedule = false;
+  bool _checkPayload = false;
   bool _isCheckingForChanges = false;
   bool _payloadCheckQueued = false;
 
@@ -105,11 +107,11 @@ class _VideoAppState extends State<VideoApp> {
   void _startChangeChecks() {
     _scheduleCheckTimer ??= Timer.periodic(
       const Duration(minutes: 1),
-      (_) => unawaited(_checkForMediaChanges()),
+      (_) => _checkSchedule = true,
     );
     _payloadCheckTimer ??= Timer.periodic(
       const Duration(minutes: 15),
-      (_) => unawaited(_checkForMediaChanges(checkPayload: true)),
+      (_) => _checkPayload = true,
     );
   }
 
@@ -253,6 +255,12 @@ class _VideoAppState extends State<VideoApp> {
     _imagePath = null;
     _videoPath = null;
     _isChangingVideo = false;
+    if(_checkSchedule) {
+      await _checkForMediaChanges();
+    }
+    if(_checkPayload) {
+      await _checkForMediaChanges(checkPayload: true);
+    }
     if (_changingPlaylist) {
       unawaited(_startNextPlaylist());
       return;
