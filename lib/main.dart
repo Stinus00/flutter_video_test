@@ -62,6 +62,7 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  // Start Next Playlist
   Future<void> _startNextPlaylist() async {
     _currentLinkIndex = 0;
     _prepareMedia(_initialPlaylistActive ? mediaLinksExtra : mediaLinks);
@@ -76,7 +77,7 @@ class _VideoAppState extends State<VideoApp> {
   }) async {
     try {
       // If on web give back just the links,
-      //  otherwise download media.
+      //  otherwise if media is empty download media.
       if (kIsWeb) {
         _mediaLinks = List.of(links);
       } else if (_mediaLinks.isEmpty) {
@@ -98,6 +99,9 @@ class _VideoAppState extends State<VideoApp> {
     }
   }
 
+  // Start timers
+  // // 1 minute for checking if schedules changed
+  // // 15 minutes for checking if api changed
   void _startChangeChecks() {
     _scheduleCheckTimer ??= Timer.periodic(
       const Duration(minutes: 1),
@@ -109,6 +113,8 @@ class _VideoAppState extends State<VideoApp> {
     );
   }
 
+  // Check if there's any changes in api or schedules
+  // Clear everything if there are changes.
   Future<void> _checkForMediaChanges({bool checkPayload = false}) async {
     if (_isPreparingMedia) return;
     if (_isCheckingForChanges) {
