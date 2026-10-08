@@ -18,46 +18,104 @@ class ApiCall {
 
   final Dio _dio;
   final MediaDownloader _downloader;
-  
+  String? _currentResponseJson;
+  String? _pendingResponseJson;
+  Set<String>? _lastActiveScheduleIds;
+
   final _playlistsMap = {};
 
   // Get data from URL
   Future<List<MediaLink>> getMediaFromApi() async {
     try {
       final data = await _getJsonFromUrl();
-
-      var jsonString = await _shortenJsonData(data);
-
-      await _saveApiResponse(jsonString);
-
-      // All lists
-      List<dynamic> media = [];
-      List<dynamic> shuffleList = [];
-      List<dynamic> mainList = [];
-      List<dynamic> combinedList = [];
-
-      var mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
-      var playlists = mapJson['playlists']['slides'];
-      _mapPlaylists(playlists);
-
-      _getGroupSchedules(media, mapJson);
-      _getSystemSchedules(media, mapJson);
-
-      _getPlaylistData(media, shuffleList, mainList);
-
-      shuffleList.shuffle();
-      
-      combinedList.addAll(mainList);
-      combinedList.addAll(shuffleList);
-
-      List<MediaLink> mediaLinks = await _convertMediaToMediaLink(combinedList);
-      List<MediaLink> newLinks = await _downloadMedia(mediaLinks);
-
-      return newLinks;
+      final jsonString = await _shortenJsonData(data);
+      return await _buildMediaFromResponse(jsonString, now: DateTime.now());
     } catch (e) {
       debugPrint('Error fetching media from API: $e');
       rethrow;
     }
+  }
+
+  // Check if API responses are different
+  Future<bool> hasPayloadChanged() async {
+    try {
+      final data = await _getJsonFromUrl();
+      final jsonString = await _shortenJsonData(data);
+      final currentResponseJson = _currentResponseJson;
+      if (currentResponseJson == null) {
+        throw StateError('Media must be loaded before checking the API.');
+      }
+
+      final newData = jsonDecode(jsonString);
+      final oldData = await _loadOldApiResponse();
+      final payloadChanged = jsonEncode(newData) != jsonEncode(oldData);
+      _pendingResponseJson = payloadChanged ? jsonString : null;
+      return payloadChanged;
+    } catch (e) {
+      debugPrint('Error checking for API payload changes: $e');
+      rethrow;
+    }
+  }
+
+  // Check if schedules are different (without calling API)
+  bool haveSchedulesChanged({DateTime? now}) {
+    final responseJson = _pendingResponseJson ?? _currentResponseJson;
+    if (responseJson == null || _lastActiveScheduleIds == null) {
+      throw StateError('Media must be loaded before checking schedules.');
+    }
+
+    final data = jsonDecode(responseJson) as Map<String, dynamic>;
+    final activeScheduleIds = _getActiveScheduleIds(
+      data,
+      now: now ?? DateTime.now(),
+    );
+    return !setEquals(activeScheduleIds, _lastActiveScheduleIds);
+  }
+
+  // Rebuild media if needed
+  // // Depends if schedules which are already loaded need to be unloaded
+  // // Depends if schedules gathered from API get active at this time.
+  Future<List<MediaLink>> rebuildMediaForCurrentSchedules({
+    DateTime? now,
+  }) async {
+    final responseJson = _pendingResponseJson ?? _currentResponseJson;
+    if (responseJson == null) {
+      throw StateError('Media must be loaded before rebuilding the playlist.');
+    }
+    return _buildMediaFromResponse(responseJson, now: now ?? DateTime.now());
+  }
+
+  // Build media list from response
+  Future<List<MediaLink>> _buildMediaFromResponse(
+    String jsonString, {
+    required DateTime now,
+  }) async {
+    final media = <dynamic>[];
+    final shuffleList = <dynamic>[];
+    final mainList = <dynamic>[];
+    final combinedList = <dynamic>[];
+    final mapJson = jsonDecode(jsonString) as Map<String, dynamic>;
+    final playlists = mapJson['playlists']['slides'];
+    _playlistsMap.clear();
+    _mapPlaylists(playlists);
+
+    final groupSchedules = _getGroupSchedules(media, mapJson, now: now);
+    final systemSchedules = _getSystemSchedules(media, mapJson, now: now);
+
+    _getPlaylistData(media, shuffleList, mainList);
+    shuffleList.shuffle();
+
+    combinedList
+      ..addAll(mainList)
+      ..addAll(shuffleList);
+
+    final mediaLinks = await _convertMediaToMediaLink(combinedList);
+    final downloadedMediaLinks = await _downloadMedia(mediaLinks);
+    await _saveApiResponse(jsonString);
+    _currentResponseJson = jsonString;
+    _pendingResponseJson = null;
+    _lastActiveScheduleIds = _scheduleIds(groupSchedules, systemSchedules);
+    return downloadedMediaLinks;
   }
 
   // Get JSON from api
@@ -84,15 +142,19 @@ class ApiCall {
   // Get the group schedules and return list.
   List<dynamic> _getGroupSchedules(
     List<dynamic> media,
-    Map<String, dynamic> data,
-  ) {
-    List<dynamic> groupSchedules = _getActiveGroupSchedules(data, now: DateTime.now().toUtc());
+    Map<String, dynamic> data, {
+    DateTime? now,
+  }) {
+    List<dynamic> groupSchedules = _getActiveGroupSchedules(data, now: now);
     media.addAll(groupSchedules);
     return groupSchedules;
   }
 
   @visibleForTesting
-  List<dynamic> getActiveGroupSchedules(Map<String, dynamic> data, DateTime? now) {
+  List<dynamic> getActiveGroupSchedules(
+    Map<String, dynamic> data,
+    DateTime? now,
+  ) {
     return _getActiveGroupSchedules(data, now: now);
   }
 
@@ -111,15 +173,19 @@ class ApiCall {
   // Get the system schedules and return list
   List<dynamic> _getSystemSchedules(
     List<dynamic> media,
-    Map<String, dynamic> data,
-  ) {
-    List<dynamic> systemSchedules = _getActiveSystemSchedules(data, now: DateTime.now().toUtc());
+    Map<String, dynamic> data, {
+    DateTime? now,
+  }) {
+    List<dynamic> systemSchedules = _getActiveSystemSchedules(data, now: now);
     media.addAll(systemSchedules);
     return systemSchedules;
   }
 
   @visibleForTesting
-  List<dynamic> getActiveSystemSchedules(Map<String, dynamic> data, DateTime? now) {
+  List<dynamic> getActiveSystemSchedules(
+    Map<String, dynamic> data,
+    DateTime? now,
+  ) {
     return _getActiveSystemSchedules(data, now: now);
   }
 
@@ -135,35 +201,68 @@ class ApiCall {
     }).toList();
   }
 
+  @visibleForTesting
+  Set<String> getActiveScheduleIds(Map<String, dynamic> data, DateTime? now) {
+    final groupSchedules = _getActiveGroupSchedules(data, now: now);
+    final systemSchedules = _getActiveSystemSchedules(data, now: now);
+    return _scheduleIds(groupSchedules, systemSchedules);
+  }
+
+  Set<String> _getActiveScheduleIds(
+    Map<String, dynamic> data, {
+    required DateTime now,
+  }) {
+    final groupSchedules = _getActiveGroupSchedules(data, now: now);
+    final systemSchedules = _getActiveSystemSchedules(data, now: now);
+    return _scheduleIds(groupSchedules, systemSchedules);
+  }
+
+  // Get all schedule ids and put them in a set for later use in checking data.
+  Set<String> _scheduleIds(
+    List<dynamic> groupSchedules,
+    List<dynamic> systemSchedules,
+  ) {
+    return {
+      ...groupSchedules.map((schedule) => 'group:${schedule['id']}'),
+      ...systemSchedules.map((schedule) => 'system:${schedule['id']}'),
+    };
+  }
+
   // Get media that will be shown right now.
   bool _createRRule(Map<String, dynamic> slide, {DateTime? now}) {
-    final start = DateTime.parse(slide['start'] as String).toUtc();
-    final end = DateTime.parse(slide['end'] as String).toUtc();
+    final start = _parseApiDateTime(slide['start'] as String);
+    final end = _parseApiDateTime(slide['end'] as String);
     if (!end.isAfter(start)) {
       throw FormatException('Schedule end must be after start.');
     }
 
-    final currentTime = (now ?? DateTime.now()).toUtc();
+    final currentTime = (now ?? DateTime.now());
     final recurrenceRule = (slide['recurrence_rule'] as String?)?.trim();
     if (recurrenceRule == null || recurrenceRule.isEmpty) {
       return !currentTime.isBefore(start) && currentTime.isBefore(end);
     }
 
-    final exceptionDates =
-        (slide['recurrence_exception'] as String? ?? '').trim();
+    final exceptionDates = (slide['recurrence_exception'] as String? ?? '')
+        .trim();
+    final localExceptionDates = exceptionDates
+        .split(',')
+        .map((date) => date.trim().replaceFirst(RegExp(r'Z$'), ''))
+        .join(',');
     final exDateLine = exceptionDates.isEmpty
         ? ''
-        : 'EXDATE:$exceptionDates\n';
+        : 'EXDATE:$localExceptionDates\n';
     final rule = RecurrenceRule.from(
-      'DTSTART:${_formatDateForRRule(start)}Z\n'
+      'DTSTART:${_formatDateForRRule(start)}\n'
       '${exDateLine}RRULE:$recurrenceRule',
     );
     if (rule == null) {
-      throw FormatException('Invalid recurrence rule for slide ${slide['id']}.');
+      throw FormatException(
+        'Invalid recurrence rule for slide ${slide['id']}.',
+      );
     }
 
     // Add today
-    final startOfToday = DateTime.utc(
+    final startOfToday = DateTime(
       currentTime.year,
       currentTime.month,
       currentTime.day,
@@ -171,9 +270,9 @@ class ApiCall {
     final tomorrow = startOfToday.add(const Duration(days: 1));
     final duration = end.difference(start);
 
-    return rule
-        .between(startOfToday.subtract(duration), tomorrow)
-        .any((occurrenceStart) {
+    return rule.between(startOfToday.subtract(duration), tomorrow).any((
+      occurrenceStart,
+    ) {
       final occurrenceEnd = occurrenceStart.add(duration);
       return !currentTime.isBefore(occurrenceStart) &&
           currentTime.isBefore(occurrenceEnd);
@@ -190,7 +289,11 @@ class ApiCall {
   }
 
   // For each schedule get playlist associated with it.
-  Future<void> _getPlaylistData(List<dynamic> schedules, List<dynamic> shuffleList, List<dynamic> mainList) async {
+  Future<void> _getPlaylistData(
+    List<dynamic> schedules,
+    List<dynamic> shuffleList,
+    List<dynamic> mainList,
+  ) async {
     for (var schedule in schedules) {
       String playlistId = schedule["playlist"]["id"];
       bool slideShuffle = schedule["slide_shuffle"] == 1;
@@ -198,7 +301,9 @@ class ApiCall {
       var playlist = _playlistsMap[playlistId];
       var slidesList = playlist['slides'];
 
-      slideShuffle ? shuffleList.addAll(slidesList) : mainList.addAll(slidesList);
+      slideShuffle
+          ? shuffleList.addAll(slidesList)
+          : mainList.addAll(slidesList);
     }
   }
 
@@ -206,8 +311,8 @@ class ApiCall {
   Future<List<MediaLink>> _convertMediaToMediaLink(List<dynamic> media) async {
     // Get mimetype from given mimetype or from link extension
     String getMimeType(String type, item) {
-      if(type == 'image') {
-        if(item['image']['mime_type']?.isNotEmpty ?? true) {
+      if (type == 'image') {
+        if (item['image']['mime_type']?.isNotEmpty ?? true) {
           return item['image']['mime_type'];
         }
         switch (_getFileExtension(item['image']['url'])) {
@@ -223,7 +328,7 @@ class ApiCall {
             return 'image/jpeg';
         }
       }
-      if(item['video']['mime_type']?.isNotEmpty ?? true) {
+      if (item['video']['mime_type']?.isNotEmpty ?? true) {
         return item['video']['mime_type'];
       }
       return 'video/mp4';
@@ -237,12 +342,21 @@ class ApiCall {
       final url = type == 'image' ? item['image']['url'] : item['video']['url'];
       final id = type == 'image' ? item['image']['id'] : item['video']['id'];
       final mimeType = getMimeType(type, item);
-      mediaLinks.add(MediaLink(link: url, type: type, duration: duration, id: id, mimeType: mimeType));
+      mediaLinks.add(
+        MediaLink(
+          link: url,
+          type: type,
+          duration: duration,
+          id: id,
+          mimeType: mimeType,
+        ),
+      );
     }
 
     return mediaLinks;
   }
 
+  // return file extension (last part of link after .)
   String _getFileExtension(String url) {
     return url.split('.').last;
   }
@@ -255,7 +369,8 @@ class ApiCall {
   // Shorten json data given, removing unnecessary objects.
   Future<String> _shortenJsonData(Map<String, dynamic> data) async {
     final system = SystemData.fromJson(data);
-    final jsonString = const JsonEncoder.withIndent('  ').convert(system.toJson());
+    final jsonString = const JsonEncoder.withIndent('  ')
+        .convert(system.toJson());
     return jsonString;
   }
 
@@ -267,7 +382,8 @@ class ApiCall {
   // Save API response to file for comparison later
   Future<void> _saveApiResponse(String jsonString) async {
     final decodedJson = jsonDecode(jsonString);
-    final formattedJson = const JsonEncoder.withIndent('  ').convert(decodedJson);
+    final formattedJson = const JsonEncoder.withIndent('  ')
+        .convert(decodedJson);
 
     final directory = await _downloader.downloadDirectory;
     final jsonDirectory = Directory('${directory.path}/json');
@@ -276,31 +392,15 @@ class ApiCall {
     await file.writeAsString(formattedJson);
   }
 
-  // Load old API response from file for comparison
+  // Load saved API response for comparison
   Future<Map<String, dynamic>> _loadOldApiResponse() async {
     final directory = await _downloader.downloadDirectory;
-    final jsonDirectory = Directory('${directory.path}/json');
-    final file = File('${jsonDirectory.path}/old_api_response.json');
+    final file = File('${directory.path}/json/old_api_response.json');
     if (!file.existsSync()) {
       throw Exception('Old API response file not found.');
     }
     final jsonString = file.readAsStringSync();
     return jsonDecode(jsonString) as Map<String, dynamic>;
-  }
-
-  // Compare old and new response
-  Future<bool> compareApiResponses() async {
-    final data = await _getJsonFromUrl();
-    var jsonString = await _shortenJsonData(data);
-
-    final newData = jsonDecode(jsonString) as Map<String, dynamic>;
-    final oldData = await _loadOldApiResponse();
-
-    final newDataString = jsonEncode(newData);
-    final oldDataString = jsonEncode(oldData);
-
-    final returnBool = newDataString == oldDataString;
-    return returnBool;
   }
 
   // Get current date
@@ -309,6 +409,20 @@ class ApiCall {
     var formatter = DateFormat('yyyy-MM-dd');
     String formattedDate = formatter.format(now);
     return formattedDate;
+  }
+
+  DateTime _parseApiDateTime(String value) {
+    final parsed = DateTime.parse(value);
+    return DateTime(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+      parsed.millisecond,
+      parsed.microsecond,
+    );
   }
 
   // Get secrets in secrets.json

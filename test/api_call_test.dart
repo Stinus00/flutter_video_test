@@ -108,7 +108,7 @@ void main() {
     test('does not include a schedule', () {
       final activeSlides = apiCall.getActiveGroupSchedules(
         decodeScheduleResponse(),
-        DateTime.utc(2026, 10, 6, 9),
+        DateTime(2026, 10, 6, 9),
       );
 
       expect(activeSlides, isEmpty);
@@ -121,7 +121,7 @@ void main() {
     test('includes schedules active during their recurring time window', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        DateTime.utc(2026, 10, 6, 9),
+        DateTime(2026, 10, 6, 9),
       );
 
       expect(activeSlides.map((slide) => slide['id']), [1558, 1560]);
@@ -130,7 +130,7 @@ void main() {
     test('excludes recurrence exception dates', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        DateTime.utc(2026, 10, 7, 9),
+        DateTime(2026, 10, 7, 9),
       );
 
       expect(activeSlides.map((slide) => slide['id']), [1560]);
@@ -139,7 +139,7 @@ void main() {
     test('does not include a schedule at its end time', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        DateTime.utc(2026, 10, 7, 18),
+        DateTime(2026, 10, 7, 18),
       );
 
       expect(activeSlides, isEmpty);
@@ -148,12 +148,12 @@ void main() {
     test('exception moved', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        DateTime.utc(2026, 10, 8, 8, 30),
+        DateTime(2026, 10, 8, 8, 30),
       );
 
       final inactiveSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        DateTime.utc(2026, 10, 8, 8),
+        DateTime(2026, 10, 8, 8),
       );
 
       expect(activeSlides.map((slide) => slide['id']), [1558, 1561]);
@@ -163,16 +163,35 @@ void main() {
     test('includes a one-off schedule only inside its start/end window', () {
       final activeSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        DateTime.utc(2026, 10, 8, 8, 30),
+        DateTime(2026, 10, 8, 8, 30),
       );
 
       final expiredSlides = apiCall.getActiveSystemSchedules(
         decodeScheduleResponse(),
-        DateTime.utc(2026, 10, 8, 18, 28, 48),
+        DateTime(2026, 10, 8, 18, 28, 48),
       );
 
       expect(activeSlides.map((slide) => slide['id']), [1558, 1561]);
       expect(expiredSlides, isEmpty);
+    });
+  });
+
+  group('getActiveScheduleIds', () {
+    final apiCall = ApiCall();
+
+    test('changes when a one-off schedule becomes active', () {
+      final beforeStart = apiCall.getActiveScheduleIds(
+        decodeScheduleResponse(),
+        DateTime(2026, 10, 8, 8),
+      );
+      final afterStart = apiCall.getActiveScheduleIds(
+        decodeScheduleResponse(),
+        DateTime(2026, 10, 8, 8, 30),
+      );
+
+      expect(beforeStart, {'system:1558'});
+      expect(afterStart, {'system:1558', 'system:1561'});
+      expect(afterStart, isNot(equals(beforeStart)));
     });
   });
 

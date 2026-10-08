@@ -38,6 +38,10 @@ class _VideoAppState extends State<VideoApp> {
   bool _changingPlaylist = false;
   String? _preloadError;
   int _currentLinkIndex = 0;
+  Timer? _scheduleCheckTimer;
+  Timer? _payloadCheckTimer;
+  bool _isCheckingForChanges = false;
+  bool _payloadCheckQueued = false;
 
   Browser? _browser;
 
@@ -48,54 +52,106 @@ class _VideoAppState extends State<VideoApp> {
   void initState() {
     super.initState();
     unawaited(WakelockPlus.enable());
-    unawaited(_prepareMedia(mediaLinks));
+    unawaited(_prepareMedia(mediaLinks, startChangeChecks: true));
   }
 
   // Check which webbrowser the user is using
   void _checkForWebBrowser() {
-    if(kIsWeb) {
+    if (kIsWeb) {
       _browser = Browser.detectOrNull();
     }
   }
 
   Future<void> _startNextPlaylist() async {
     _currentLinkIndex = 0;
-    _prepareMedia( _initialPlaylistActive ? mediaLinksExtra : mediaLinks);
+    _prepareMedia(_initialPlaylistActive ? mediaLinksExtra : mediaLinks);
     _initialPlaylistActive = !_initialPlaylistActive;
     _changingPlaylist = false;
   }
 
   // Download the media given and initialize the first media.
-  Future<void> _prepareMedia(List<MediaLink> links) async {
-    Future<List<MediaLink>> gatherMedia() async {
-      if (_mediaLinks.isEmpty) return await _apiCall.getMediaFromApi();
-
-      bool isSame = await _apiCall.compareApiResponses();
-      if(isSame) {
-        debugPrint('+ Same as last time, skipping...');
-        return _mediaLinks;
-      }
-      debugPrint('- Not same as last time, downloading media.');
-
-      return await _apiCall.getMediaFromApi();
-    }
-
+  Future<void> _prepareMedia(
+    List<MediaLink> links, {
+    bool startChangeChecks = false,
+  }) async {
     try {
-      // If on web give back just the links, 
+      // If on web give back just the links,
       //  otherwise download media.
-      _mediaLinks = kIsWeb == true
-          ? List.of(links)
-          : await gatherMedia();
+      if (kIsWeb) {
+        _mediaLinks = List.of(links);
+      } else if (_mediaLinks.isEmpty) {
+        _mediaLinks = await _apiCall.getMediaFromApi();
+      }
 
       _isPreparingMedia = false;
       if (mounted) setState(() {});
       await _initializeMedia();
+      if (startChangeChecks && !kIsWeb) {
+        _startChangeChecks();
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _isPreparingMedia = false;
         _preloadError = error.toString();
       });
+    }
+  }
+
+  void _startChangeChecks() {
+    _scheduleCheckTimer ??= Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => unawaited(_checkForMediaChanges()),
+    );
+    _payloadCheckTimer ??= Timer.periodic(
+      const Duration(minutes: 15),
+      (_) => unawaited(_checkForMediaChanges(checkPayload: true)),
+    );
+  }
+
+  Future<void> _checkForMediaChanges({bool checkPayload = false}) async {
+    if (_isPreparingMedia) return;
+    if (_isCheckingForChanges) {
+      _payloadCheckQueued = _payloadCheckQueued || checkPayload;
+      return;
+    }
+
+    _isCheckingForChanges = true;
+    try {
+      final payloadChanged = checkPayload
+          ? await _apiCall.hasPayloadChanged()
+          : false;
+      final schedulesChanged = _apiCall.haveSchedulesChanged();
+      if (!payloadChanged && !schedulesChanged) return;
+
+      final updatedMediaLinks = await _apiCall
+          .rebuildMediaForCurrentSchedules();
+      _isChangingVideo = true;
+      _imageTimer?.cancel();
+      _imageTimer = null;
+      final controller = _controller;
+      controller?.removeListener(_handleVideoState);
+      await controller?.dispose();
+      _controller = null;
+      _mediaLinks = updatedMediaLinks;
+      _currentLinkIndex = 0;
+      _videoError = null;
+      _imagePath = null;
+      _videoPath = null;
+      _isChangingVideo = false;
+
+      if (!mounted) return;
+      setState(() {});
+      await _initializeMedia();
+    } catch (error) {
+      debugPrint('Error checking for media changes: $error');
+    } finally {
+      _isChangingVideo = false;
+      _isCheckingForChanges = false;
+      if (_payloadCheckQueued && mounted) {
+        _payloadCheckQueued = false;
+        unawaited(_checkForMediaChanges(checkPayload: true));
+      }
     }
   }
 
@@ -118,7 +174,7 @@ class _VideoAppState extends State<VideoApp> {
       );
       return;
     }
-    
+
     _checkForWebBrowser();
 
     // Use file path if not on web and
@@ -307,7 +363,8 @@ class _VideoAppState extends State<VideoApp> {
         scale: animation,
         child: FadeTransition(opacity: animation, child: child),
       ),
-      child: _videoError == null &&
+      child:
+          _videoError == null &&
               kIsWeb &&
               !_hasStartedPlayback &&
               _controller?.value.isInitialized == true &&
@@ -339,28 +396,29 @@ class _VideoAppState extends State<VideoApp> {
         scale: animation,
         child: FadeTransition(opacity: animation, child: child),
       ),
-      child:
-        FloatingActionButton.extended(
-          key: const ValueKey('sample-button'),
-          backgroundColor: const Color.fromARGB(98, 59, 128, 255),
-          hoverColor: const Color.fromARGB(97, 45, 119, 255),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          onPressed: () {
-            setState(() {
-              _changingPlaylist = true;
-              if (_mediaLinks.isEmpty) _startNextPlaylist();
-            });
-          },
-          icon: const Icon(Icons.play_arrow),
-          label: const Text('Next'),
-        )
+      child: FloatingActionButton.extended(
+        key: const ValueKey('sample-button'),
+        backgroundColor: const Color.fromARGB(98, 59, 128, 255),
+        hoverColor: const Color.fromARGB(97, 45, 119, 255),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        onPressed: () {
+          setState(() {
+            _changingPlaylist = true;
+            if (_mediaLinks.isEmpty) _startNextPlaylist();
+          });
+        },
+        icon: const Icon(Icons.play_arrow),
+        label: const Text('Next'),
+      ),
     );
   }
 
   @override
   void dispose() {
     _imageTimer?.cancel();
+    _scheduleCheckTimer?.cancel();
+    _payloadCheckTimer?.cancel();
     _controller?.dispose();
     unawaited(WakelockPlus.disable());
     super.dispose();
